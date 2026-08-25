@@ -64,6 +64,7 @@ jobs:
           fi
 
       - name: Install dependencies
+        working-directory: frontend
         run: yarn install --frozen-lockfile
 
       - name: Expo prebuild (generate native android project)
