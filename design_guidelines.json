@@ -1,0 +1,179 @@
+{
+  "app_name": "Twogether",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A deeply intimate, distraction-free space for two, pairing the highly functional clarity of iOS messaging with a warm, romantic, and inviting aesthetic.",
+  "color": {
+    "surface": "#FDFBF9",
+    "onSurface": "#2B2524",
+    "surfaceSecondary": "#F5EFEA",
+    "onSurfaceSecondary": "#4A4240",
+    "surfaceTertiary": "#EBE3DE",
+    "onSurfaceTertiary": "#5C5250",
+    "surfaceInverse": "#2B2524",
+    "onSurfaceInverse": "#FDFBF9",
+    "brand": "#D92525",
+    "brandPrimary": "#D92525",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#F48B8B",
+    "onBrandSecondary": "#2B2524",
+    "brandTertiary": "#FAE6E6",
+    "onBrandTertiary": "#A81A1A",
+    "success": "#3D7D53",
+    "onSuccess": "#FFFFFF",
+    "warning": "#B6891C",
+    "onWarning": "#FFFFFF",
+    "error": "#D92525",
+    "onError": "#FFFFFF",
+    "info": "#4A4240",
+    "onInfo": "#FFFFFF",
+    "border": "#EBE3DE",
+    "borderStrong": "#D6C9C4",
+    "divider": "#F0E8E3",
+    "dark_surface": "#1C1817",
+    "dark_onSurface": "#FDFBF9",
+    "dark_surfaceSecondary": "#272220",
+    "dark_onSurfaceSecondary": "#EBE3DE",
+    "dark_surfaceTertiary": "#352E2C",
+    "dark_onSurfaceTertiary": "#D6C9C4",
+    "dark_surfaceInverse": "#FDFBF9",
+    "dark_onSurfaceInverse": "#1C1817",
+    "dark_brand": "#E53939",
+    "dark_brandPrimary": "#E53939",
+    "dark_onBrandPrimary": "#FFFFFF",
+    "dark_brandSecondary": "#D96666",
+    "dark_onBrandSecondary": "#1C1817",
+    "dark_brandTertiary": "#401D1D",
+    "dark_onBrandTertiary": "#F4B3B3",
+    "dark_success": "#4A9965",
+    "dark_onSuccess": "#FFFFFF",
+    "dark_warning": "#CFA33A",
+    "dark_onWarning": "#1C1817",
+    "dark_error": "#E53939",
+    "dark_onError": "#FFFFFF",
+    "dark_info": "#D6C9C4",
+    "dark_onInfo": "#1C1817",
+    "dark_border": "#352E2C",
+    "dark_borderStrong": "#4A4240",
+    "dark_divider": "#2F2927"
+  },
+  "typography": {
+    "displayFontFamily": "DM Sans",
+    "textFontFamily": "DM Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room. Avoid dense clusters; use iOS-native spacing rhythm for comfortable touch targets and clear grouping.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use frosted glass on the bottom tab bar, especially as chat or calendar content scrolls behind it.",
+      "Use frosted glass on sticky dates/headers in the chat or calendar views.",
+      "Use blur on modal scrims when opening the 'Worries' space to separate it emotionally and visually."
+    ],
+    "dont's": [
+      "Do not use glassmorphism on individual chat bubbles or form inputs.",
+      "Do not apply glass effects in dense settings views where clarity is prioritized."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Pairing / Onboarding",
+      "purpose": "A warm, full-screen introductory flow explaining the private, two-person nature of the app and prompting for the invite code.",
+      "states": {
+        "loading": "Centered brand-colored spinner",
+        "empty": "N/A",
+        "error": "Readable inline error message for invalid invite code with retry button."
+      },
+      "layout": "Hero image at the top with a top-to-bottom vertical gradient scrim, overlaid with the bold red '2Gether' logo. Below the image: title, warm supportive subtitle, and a single-column clean form for the invite code. Sticky primary CTA at the bottom inside KeyboardAvoidingView."
+    },
+    {
+      "name": "Chat (Main 1-to-1 Feed)",
+      "purpose": "The core communication hub featuring encrypted messages, photo/video sharing with view-once toggles, and call shortcuts.",
+      "states": {
+        "loading": "Skeleton text bubbles.",
+        "empty": "A romantic, tinted illustration (brandTertiary container) in the center with a prompt 'Start your conversation...' and a primary button to send a photo or message.",
+        "error": "Error banner at the top of the chat list, prompting network retry."
+      },
+      "layout": "iOS-native chat structure. Sticky top header (glassmorphism) with partner's avatar, connection status, and call buttons. Scrollable chat feed with clear right/left bubble alignment. Partner bubbles in surfaceSecondary, user bubbles in brandPrimary. Sticky input composer at the bottom with a 'Worries' quick-action or media attachment icon."
+    },
+    {
+      "name": "Shared Calendar",
+      "purpose": "A unified view of both partners' schedules, highlighting shared dates, reminders, and synced events.",
+      "states": {
+        "loading": "Skeleton grid calendar.",
+        "empty": "Illustration of a calendar with a heart badge, text 'No plans yet. Schedule a date night!' and a CTA to add an event.",
+        "error": "Failed to sync calendar message with a retry button."
+      },
+      "layout": "Monthly calendar widget at the top (or weekly strip), followed by a vertical, time-grouped list of upcoming events. Events use brandTertiary tags to highlight 'Shared/Date Night' vs personal tasks. Pinned action button (FAB) for adding new events."
+    },
+    {
+      "name": "Worries Space",
+      "purpose": "A dedicated, calm conversation area to raise relationship concerns constructively without turning them into immediate chat arguments.",
+      "states": {
+        "loading": "Centered subtle spinner.",
+        "empty": "Soft, calm icon layout with text 'A safe space to share what's on your mind. Everything is okay.'",
+        "error": "Failed to load space, tap to retry."
+      },
+      "layout": "Visually distinct from the main chat to signify a shift in tone. Uses a slightly warmer background (surfaceSecondary) full bleed. Card-based list of 'Topics' or 'Concerns' rather than an immediate raw chat feed, encouraging thoughtful long-form writing. Uses bottom sheet for drafting a new concern."
+    }
+  ],
+  "images": {
+    "onboarding_hero": {
+      "url": "https://images.unsplash.com/photo-1480618376353-2950ee462b17?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxyb21hbnRpYyUyMGNvdXBsZSUyMGxvbmclMjBkaXN0YW5jZSUyMGh1Z2dpbmclMjBvciUyMGhvbGRpbmclMjBoYW5kc3xlbnwwfHx8fDE3ODc2NzE2Mzh8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "shallow focus photography of man and woman holding hands"
+    },
+    "worries_empty_state": {
+      "url": "https://images.pexels.com/photos/5910861/pexels-photo-5910861.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Anonymous loving couple resting on bench while holding hands"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the '1 iOS-Native Clean' spacing scale. Do not clutter the screen; the messaging UI should frame the conversation, not distract from it.",
+    "Implement the 'Warm Romantic Palette' meticulously: base colors are warm bone-white and soft blush/cream (no harsh pure white or cold grays), offset by the bold red 'brandPrimary' (#D92525) for buttons and user chat bubbles.",
+    "BANNED: Any shade of blue, purple, indigo, or orange. Use the provided warm charcoal (#2B2524) for primary text, and moss green / warm mustard strictly for status colors.",
+    "For the 'Worries Space', ensure a distinct tone by using `surfaceSecondary` as the main background and card-based topic threads instead of standard chat bubbles, promoting slow, thoughtful communication.",
+    "Whenever overlaying text on the onboarding hero image, you MUST implement a gradient-to-dark scrim (top to bottom, transparent to ≥70% surfaceInverse) to guarantee WCAG contrast.",
+    "All interactive elements (tabs, primary buttons, message sends) must be wired with haptic feedback (expo-haptics) to provide a tactile, responsive feel."
+  ],
+  "haptics": {
+    "primary_button_press": "impactLight",
+    "tab_bar_switch": "selection",
+    "send_message": "impactMedium",
+    "toggle_view_once": "impactLight"
+  }
+}
