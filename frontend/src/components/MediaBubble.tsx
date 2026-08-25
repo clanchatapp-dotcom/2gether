@@ -5,6 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as Haptics from "expo-haptics";
 import { fetchAndDecryptMedia, decryptToPlayableUri } from "@/src/lib/media";
+import { saveMediaToGallery } from "@/src/lib/save";
+import { PrivacyGuard } from "@/src/components/PrivacyGuard";
 import { C, F, S, R, type } from "@/src/theme/theme";
 
 const { width } = Dimensions.get("window");
@@ -43,6 +45,23 @@ export function MediaBubble({
   const [consumed, setConsumed] = useState(false);
   const [viewer, setViewer] = useState(false);
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const canSave = !!msg.allow_save && !viewOnce;
+  const doSave = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const r = await saveMediaToGallery(msg.media_id!, msg.media_nonce!, msg.media_mime || "image/jpeg", partnerPub);
+    const m =
+      r.ok
+        ? "Saved to your photos"
+        : r.reason === "web"
+          ? "Saving works on the mobile app"
+          : r.reason === "permission"
+            ? "Allow photo access to save"
+            : "Couldn't save";
+    setToast(m);
+    setTimeout(() => setToast(null), 2200);
+  };
 
   // Auto-load inline thumbnail for normal (non-view-once) images.
   useEffect(() => {
@@ -186,19 +205,36 @@ export function MediaBubble({
   function renderViewer() {
     return (
       <Modal visible={viewer} transparent animationType="fade" onRequestClose={() => setViewer(false)}>
-        <View style={styles.viewerScrim}>
-          <Pressable style={styles.viewerClose} onPress={() => setViewer(false)} testID="media-viewer-close">
-            <Ionicons name="close" size={28} color="#fff" />
-          </Pressable>
-          {videoUri ? (
-            <VideoPlayerView uri={videoUri} />
-          ) : uri ? (
-            <Image source={{ uri }} style={styles.viewerImg} contentFit="contain" />
-          ) : null}
-          {viewOnce ? (
-            <Text style={styles.viewerHint}>This can only be viewed once</Text>
-          ) : null}
-        </View>
+        <PrivacyGuard partnerPub={partnerPub} label={isVideo ? "a video" : "a photo"}>
+          <View style={styles.viewerScrim}>
+            <Pressable style={styles.viewerClose} onPress={() => setViewer(false)} testID="media-viewer-close">
+              <Ionicons name="close" size={28} color="#fff" />
+            </Pressable>
+            {videoUri ? (
+              <VideoPlayerView uri={videoUri} />
+            ) : uri ? (
+              <Image source={{ uri }} style={styles.viewerImg} contentFit="contain" />
+            ) : null}
+            {canSave ? (
+              <Pressable style={styles.saveFab} onPress={doSave} testID={`media-save-${msg.id}`}>
+                <Ionicons name="download" size={20} color="#fff" />
+                <Text style={styles.saveFabText}>Save</Text>
+              </Pressable>
+            ) : viewOnce ? (
+              <Text style={styles.viewerHint}>This can only be viewed once</Text>
+            ) : (
+              <View style={styles.noSave}>
+                <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.noSaveText}>Saving disabled by sender</Text>
+              </View>
+            )}
+            {toast ? (
+              <View style={styles.toast} testID="media-toast">
+                <Text style={styles.toastText}>{toast}</Text>
+              </View>
+            ) : null}
+          </View>
+        </PrivacyGuard>
       </Modal>
     );
   }
@@ -230,4 +266,20 @@ const styles = StyleSheet.create({
   viewerImg: { width: "100%", height: "80%" },
   viewerVideo: { width: "100%", height: "70%" },
   viewerHint: { position: "absolute", bottom: 60, color: "#fff", fontFamily: F.medium, fontSize: type.base, opacity: 0.8 },
+  saveFab: {
+    position: "absolute",
+    bottom: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: S.sm,
+    backgroundColor: C.brandPrimary,
+    paddingHorizontal: S.xl,
+    paddingVertical: S.md,
+    borderRadius: R.pill,
+  },
+  saveFabText: { fontFamily: F.semibold, fontSize: type.lg, color: "#fff" },
+  noSave: { position: "absolute", bottom: 62, flexDirection: "row", alignItems: "center", gap: S.xs },
+  noSaveText: { fontFamily: F.medium, fontSize: type.base, color: "rgba(255,255,255,0.8)" },
+  toast: { position: "absolute", bottom: 116, backgroundColor: C.surfaceInverse, paddingHorizontal: S.lg, paddingVertical: S.sm, borderRadius: R.pill },
+  toastText: { fontFamily: F.medium, fontSize: type.base, color: C.onSurfaceInverse },
 });

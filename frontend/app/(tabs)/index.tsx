@@ -196,7 +196,7 @@ export default function Chat() {
     }
   };
 
-  const lastMineId = [...messages].reverse().find((m) => m.sender_id === user?.id)?.id;
+  const lastMineId = [...messages].reverse().find((m) => m.sender_id === user?.id && m.kind !== "system")?.id;
 
   const sendMedia = async (kind: "image" | "video") => {
     if (!partner?.public_key) return;
@@ -236,6 +236,18 @@ export default function Chat() {
 
   const renderItem = ({ item }: { item: Msg }) => {
     const mine = item.sender_id === user?.id;
+    if (item.kind === "system") {
+      return (
+        <View style={styles.systemRow} testID={`system-${item.id}`}>
+          <View style={styles.systemPill}>
+            <Ionicons name="warning" size={12} color={C.warning} />
+            <Text style={styles.systemText}>
+              {mine ? "You" : partner?.display_name || "Partner"} {texts[item.id] ?? "…"}
+            </Text>
+          </View>
+        </View>
+      );
+    }
     const showRead = mine && item.id === lastMineId && (readAll || item.viewed);
     const isMedia = item.kind === "image" || item.kind === "video";
     const caption = texts[item.id];
@@ -299,6 +311,9 @@ export default function Chat() {
             </View>
           )}
         </View>
+        <Pressable testID="chat-gallery" style={styles.callBtn} onPress={() => router.push("/gallery")}>
+          <Ionicons name="images" size={19} color={C.brandPrimary} />
+        </Pressable>
         <Pressable testID="chat-voice-call" style={styles.callBtn} onPress={() => router.push("/call?mode=voice")}>
           <Ionicons name="call" size={20} color={C.brandPrimary} />
         </Pressable>
@@ -479,6 +494,18 @@ const styles = StyleSheet.create({
   e2eRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 },
   e2eText: { fontFamily: F.regular, fontSize: type.sm, color: C.success },
   typingText: { fontFamily: F.medium, fontSize: type.sm, color: C.brandPrimary, marginTop: 1 },
+  systemRow: { alignItems: "center", marginVertical: S.sm },
+  systemPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: S.xs,
+    backgroundColor: "#F7EEDC",
+    paddingHorizontal: S.md,
+    paddingVertical: 6,
+    borderRadius: R.pill,
+    maxWidth: "85%",
+  },
+  systemText: { fontFamily: F.medium, fontSize: type.sm, color: "#8A6D1E", textAlign: "center" },
   readRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3, marginRight: 2 },
   readText: { fontFamily: F.medium, fontSize: 10, color: C.brandPrimary },
   typingBubble: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: S.md },

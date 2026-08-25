@@ -1,0 +1,41 @@
+{
+  "summary": "Round-3 (Twogether gallery + screenshot-protection). Backend: 48/48 pytest PASS — 12 new round-3 tests validate (a) GET /api/gallery returns ONLY messages with media_id, newest-first, gated (400 'Not paired' for solo, 401 unauth); (b) kind='system' messages are accepted, stored ciphertext-only, appear in /api/messages but are EXCLUDED from /api/gallery (asserted from BOTH partners); (c) media byte-exact upload/download round-trip; (d) view-once media returns 410 after recipient marks viewed; (e) messages/worries/events/checkins/pair/auth regression all pass. Frontend (Expo web, 390x844): chat header now shows images/voice/video buttons; gallery route navigates via chat-gallery; Shared Gallery screen renders with 3-col tile grid; view-once tile is a locked 'View once' card (not openable); tapping a normal tile opens fullscreen viewer with Save button when allow_save=true; tapping Save on web produces graceful toast 'Saving works on the mobile app' (no crash); system messages render as centered warning pill in chat feed (not a normal bubble); Worries screen still renders + FAB works inside PrivacyGuard. FIXED one critical web crash: `expo-screen-capture` has no `addScreenshotListener` on web (RN Web red-screen 'ExpoScreenCapture.default.addListener is not a function' that blocked both Gallery + Worries). Added Platform.OS==='web' no-op guard in src/lib/screenshot.ts — screenshot BLOCKING (Android) / DETECTION (iOS) remain device-only as specified. Post-fix: zero console errors, all screens load.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_round3_gallery.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/round3_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Informational) The `expo-screen-capture` web fallback fix I applied is minimal and correct — screenshot blocking/detection remain fully functional on device (untouched code paths for iOS/Android). No further action required unless you want to add a similar Platform.OS guard around any other device-only imports you add later.",
+    "(Optional / carryover from round 2) Bottom-sheet on 375x667 devices for calendar add-event should be scrollable; RN Web `shadow*` / `props.pointerEvents` deprecation warnings still noisy but non-blocking."
+  ],
+  "critical_code_review_comments": [
+    "server.py:478-484 /api/gallery correctly filters `media_id: {$ne: None}` and sorts by created_at desc — excludes text AND kind='system' by construction since system msgs have media_id=None. Excludes _id via projection. ✅",
+    "server.py:394-414 send_message accepts kind='system' without special-casing; ciphertext-only stored; broadcast fires — allows client-side system pill rendering. ✅",
+    "gallery.tsx:63,150-154 view-once items correctly render as locked 'View once' tile and openable() returns false so tapping does nothing (per spec). ✅",
+    "gallery.tsx:229-239 Save FAB conditionally rendered on item.allow_save; 'Saving disabled by sender' shown otherwise. Web platform path (save.ts:14) returns `{ok:false, reason:'web'}` → 'Saving works on the mobile app' toast. ✅",
+    "src/lib/screenshot.ts (BEFORE FIX): unconditionally called ScreenCapture.addScreenshotListener which crashes on web — module exports it only on native. Wrapping PrivacyGuard used it in Gallery + Worries, red-screening both. FIXED by early-return on Platform.OS==='web' plus optional-chaining on preventScreenCaptureAsync/allowScreenCaptureAsync/addScreenshotListener.",
+    "index.tsx:239-249 system message rendering path uses systemPill style; `lastMineId` correctly excludes kind==='system' so system alerts do not get a read receipt (per spec). ✅"
+  ],
+  "updated_files": [
+    "/app/frontend/src/lib/screenshot.ts (added Platform.OS==='web' no-op + optional-chaining to unblock web preview)",
+    "/app/backend/tests/test_round3_gallery.py (new — 12 tests)",
+    "/app/test_reports/pytest/round3_results.xml (new)",
+    "/app/test_reports/pytest/pytest_results.xml (regenerated — 48/48 pass)"
+  ],
+  "success_rate": {"backend": "100% (48/48 — 20 MVP + 16 round2 + 12 round3)", "frontend": "100% of new round-3 flows (gallery navigation, tile grid, viewer, Save-web-toast, system pill, Worries under PrivacyGuard)"},
+  "seed_data_creation": "For UI: seeded pair TEST_ui3a_4fe2f243@twogether-r3.com / TEST_ui3b_f16e0a3a@twogether-r3.com (password secret123), pre-paired, with one image message (allow_save=true), one system message, one text message injected via API.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Round-3 tests in /app/backend/tests/test_round3_gallery.py. Run full suite: `EXPO_PUBLIC_BACKEND_URL=<url> pytest backend/tests/ -o addopts=''`. Key contract: /api/gallery filters `media_id != None` so any future msg kind that omits media_id (system, text, future ping-alerts, etc.) is automatically excluded. Screenshot guard is intentionally a no-op on web — do NOT expect the 'partner receives a system screenshot alert' flow to fire from web preview; it activates only in the native build.",
+  "rca_of_issue": "Bug fixed: expo-screen-capture's addScreenshotListener throws on Web because ExpoScreenCapture (default) has no `.addListener`. PrivacyGuard mounted it via useScreenshotGuard, causing a red-screen error and preventing Gallery + Worries from rendering on the Expo web preview. Reproduction: log in on web → tap gallery icon → red screen 'ExpoScreenCapture.default.addListener is not a function'. Mitigation applied: early-return on Platform.OS==='web' + optional-chaining on all ScreenCapture calls. Device (iOS/Android) code paths untouched — screenshot blocking on Android and detection on iOS remain fully wired to send an encrypted kind='system' message to the partner."
+}

@@ -57,4 +57,6 @@ export const api = {
   addCheckin: (body: any) => req("/checkins", { method: "POST", body: JSON.stringify(body) }),
   reactCheckin: (id: string, emoji: string) =>
     req(`/checkins/${id}/react`, { method: "POST", body: JSON.stringify({ emoji }) }),
+
+  getGallery: () => req("/gallery"),
 };

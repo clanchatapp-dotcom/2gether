@@ -475,6 +475,15 @@ async def media_download(media_id: str, user=Depends(get_current_user)):
     return Response(content=data, media_type="application/octet-stream")
 
 
+@api_router.get("/gallery")
+async def gallery(user=Depends(get_current_user)):
+    pair = await require_active_pair(user)
+    items = await db.messages.find(
+        {"pair_id": pair["id"], "media_id": {"$ne": None}}, {"_id": 0}
+    ).sort("created_at", -1).to_list(300)
+    return {"items": items}
+
+
 # ----------------------------- Worries -----------------------------
 @api_router.get("/worries")
 async def get_worries(user=Depends(get_current_user)):

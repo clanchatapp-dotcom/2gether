@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import { useAuth } from "@/src/context/AuthContext";
 import { api } from "@/src/lib/api";
 import { encryptMessage, decryptMessage } from "@/src/lib/crypto";
+import { PrivacyGuard } from "@/src/components/PrivacyGuard";
 import { C, F, S, R, type } from "@/src/theme/theme";
 
 type Worry = {
@@ -90,6 +91,7 @@ export default function Worries() {
   const resolved = worries.filter((w) => w.resolved);
 
   return (
+    <PrivacyGuard partnerPub={partner?.public_key} label="the worries space">
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + S.sm }]}>
         <Text style={styles.headerTitle}>Worries</Text>
@@ -189,6 +191,7 @@ export default function Worries() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+    </PrivacyGuard>
   );
 }
 

@@ -51,6 +51,14 @@ rebuilt fresh for React Native / Expo + FastAPI + MongoDB, following the spec co
 - Daily Check-in (Mood tab): mood emoji + optional E2E-encrypted note (one upsert per day); partner emoji reactions.
 - Tested: 36/36 backend pytest pass; all 5 frontend features verified by testing agent.
 
+## Implemented — Round 3 (2026-06-25)
+- Explicit save permission on send: sender chooses "Allow saving" yes/no per media.
+- Save-to-gallery: receiver gets a Save button (expo-media-library) ONLY when allowed; disabled/hidden otherwise.
+- Shared Gallery screen (pushed from chat header): grid of all previously shared media; view-once items shown as locked tiles; fullscreen viewer with Save.
+- Screenshot protection (expo-screen-capture): blocks on Android (FLAG_SECURE) across media viewer, gallery, and Worries; on iOS detects screenshots and warns the partner via an encrypted 'system' chat message (centered warning pill); content blurred/hidden when app backgrounded (PrivacyGuard + AppState). Web = graceful no-op.
+- Backend GET /api/gallery (media-only, excludes system/text messages).
+- Tested: 48/48 backend pytest pass; new gallery/save/screenshot flows verified (device-only paths confirmed graceful on web).
+
 ## Backlog / Remaining
 - P0: Wire LiveKit for real E2E voice/video calling (device build + signaling).
 - P0: Screenshot/save blocking (platform-native, device build only).
