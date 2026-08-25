@@ -1,0 +1,96 @@
+name: Android APK
+
+# Builds an installable Android APK for the Twogether Expo app.
+# Flow: yarn install -> expo prebuild (generates the native android/ project)
+#       -> Gradle assemble. The Expo release template signs the release APK with
+#       the debug keystore by default, so the output is installable with NO
+#       keystore setup required. This workflow is self-contained and does NOT
+#       use eas.json or any Emergent build configuration.
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "Build variant"
+        type: choice
+        default: release
+        options:
+          - release   # JS bundled, debug-signed, installable/shareable
+          - debug     # connects to a Metro dev server (for local dev only)
+  push:
+    branches: [main]
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # frontend/.env is git-ignored, so provide the backend URL via a repo secret:
+      # Settings -> Secrets and variables -> Actions -> New repository secret
+      #   Name: EXPO_PUBLIC_BACKEND_URL   Value: https://your-deployed-backend
+      EXPO_PUBLIC_BACKEND_URL: ${{ secrets.EXPO_PUBLIC_BACKEND_URL }}
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Warn if backend URL secret is missing
+        run: |
+          if [ -z "$EXPO_PUBLIC_BACKEND_URL" ]; then
+            echo "::warning::EXPO_PUBLIC_BACKEND_URL secret is not set. The APK will build, but the app won't reach your backend. Add it under repo Settings -> Secrets -> Actions."
+          fi
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Expo prebuild (generate native android project)
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build APK
+        run: |
+          VARIANT="${{ github.event.inputs.variant || 'release' }}"
+          TASK="assemble$(echo "${VARIANT^}")"
+          echo "Running Gradle task: $TASK"
+          cd android
+          ./gradlew "$TASK" --no-daemon --stacktrace
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK_PATH="$(find android/app/build/outputs/apk -name '*.apk' | head -n 1)"
+          echo "Found APK at: $APK_PATH"
+          echo "path=frontend/$APK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: twogether-android-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
