@@ -198,12 +198,13 @@ class RedeemIn(BaseModel):
 class MessageIn(BaseModel):
     nonce: str
     ciphertext: str
-    kind: str = "text"  # text | image | video
+    kind: str = "text"  # text | image | video | system
     media_id: Optional[str] = None
     media_nonce: Optional[str] = None
     media_mime: Optional[str] = None
     view_once: bool = False
     allow_save: bool = True
+    expire_seconds: Optional[int] = None  # media auto-expires this many seconds after sending
 
 
 class MediaUploadIn(BaseModel):
@@ -393,6 +394,9 @@ async def get_messages(after: Optional[str] = None, user=Depends(get_current_use
 @api_router.post("/messages")
 async def send_message(body: MessageIn, user=Depends(get_current_user)):
     pair = await require_active_pair(user)
+    expires_at = None
+    if body.expire_seconds and body.expire_seconds > 0:
+        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=body.expire_seconds)).isoformat()
     msg = {
         "id": str(uuid.uuid4()),
         "pair_id": pair["id"],
@@ -405,11 +409,14 @@ async def send_message(body: MessageIn, user=Depends(get_current_user)):
         "media_mime": body.media_mime,
         "view_once": body.view_once,
         "allow_save": body.allow_save,
+        "expires_at": expires_at,
         "viewed": False,
         "created_at": now_iso(),
     }
     await db.messages.insert_one(msg)
     msg.pop("_id", None)
+    if expires_at and body.media_id:
+        await db.media.update_one({"id": body.media_id}, {"$set": {"expires_at": expires_at}})
     await manager.broadcast(pair["id"], {"type": "message", "message": msg})
     return {"message": msg}
 
@@ -468,6 +475,9 @@ async def media_download(media_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Media not found")
     if doc.get("consumed"):
         raise HTTPException(status_code=410, detail="This media is no longer available")
+    if doc.get("expires_at") and now_iso() > doc["expires_at"]:
+        await db.media.update_one({"id": media_id}, {"$set": {"consumed": True}})
+        raise HTTPException(status_code=410, detail="This media has expired")
     try:
         data = await run_in_threadpool(get_object, doc["storage_path"])
     except Exception:
@@ -478,8 +488,14 @@ async def media_download(media_id: str, user=Depends(get_current_user)):
 @api_router.get("/gallery")
 async def gallery(user=Depends(get_current_user)):
     pair = await require_active_pair(user)
+    now = now_iso()
     items = await db.messages.find(
-        {"pair_id": pair["id"], "media_id": {"$ne": None}}, {"_id": 0}
+        {
+            "pair_id": pair["id"],
+            "media_id": {"$ne": None},
+            "$or": [{"expires_at": None}, {"expires_at": {"$gt": now}}],
+        },
+        {"_id": 0},
     ).sort("created_at", -1).to_list(300)
     return {"items": items}
 

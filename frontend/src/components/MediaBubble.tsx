@@ -20,6 +20,7 @@ type Msg = {
   media_mime?: string;
   view_once?: boolean;
   allow_save?: boolean;
+  expires_at?: string | null;
   viewed?: boolean;
   sender_id: string;
 };
@@ -38,6 +39,26 @@ export function MediaBubble({
   const isVideo = msg.kind === "video";
   const viewOnce = !!msg.view_once;
   const recipientViewOnce = viewOnce && !mine;
+  const [now, setNow] = useState(Date.now());
+  const expiresMs = msg.expires_at ? Date.parse(msg.expires_at) : 0;
+  const expired = expiresMs > 0 && now > expiresMs;
+
+  // Tick every 30s so the countdown label + expiry state stay fresh.
+  useEffect(() => {
+    if (!expiresMs) return;
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, [expiresMs]);
+
+  const expiryLabel = (() => {
+    if (!expiresMs || expired) return null;
+    const rem = Math.max(0, expiresMs - now);
+    const h = Math.floor(rem / 3600000);
+    const d = Math.floor(h / 24);
+    if (d >= 1) return `Vanishes in ${d}d`;
+    if (h >= 1) return `Vanishes in ${h}h`;
+    return `Vanishes in ${Math.max(1, Math.floor(rem / 60000))}m`;
+  })();
 
   const [uri, setUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,7 +88,7 @@ export function MediaBubble({
   useEffect(() => {
     let active = true;
     if (!msg.media_id || !msg.media_nonce || !partnerPub) return;
-    if (isVideo || recipientViewOnce) return; // videos & recipient view-once load on demand
+    if (expired || isVideo || recipientViewOnce) return; // videos & recipient view-once load on demand
     setLoading(true);
     fetchAndDecryptMedia(msg.media_id, msg.media_nonce, msg.media_mime || "image/jpeg", partnerPub)
       .then((u) => active && setUri(u))
@@ -116,6 +137,18 @@ export function MediaBubble({
   };
 
   const bubbleBg = mine ? styles.mine : styles.theirs;
+
+  // ---- Expired ----
+  if (expired) {
+    return (
+      <View style={[styles.card, bubbleBg]} testID={`media-expired-${msg.id}`}>
+        <View style={styles.coverBox}>
+          <Ionicons name="timer-outline" size={24} color={C.muted} />
+          <Text style={styles.coverText}>{isVideo ? "Video" : "Photo"} expired</Text>
+        </View>
+      </View>
+    );
+  }
 
   // ---- View-once covered card (recipient) ----
   if (recipientViewOnce && !viewer) {
@@ -170,6 +203,12 @@ export function MediaBubble({
             <Text style={[styles.metaText, mine && { color: "rgba(255,255,255,0.85)" }]}>View once</Text>
           </View>
         ) : null}
+        {expiryLabel ? (
+          <View style={styles.metaRow}>
+            <Ionicons name="timer-outline" size={11} color={mine ? "rgba(255,255,255,0.85)" : C.warning} />
+            <Text style={[styles.metaText, mine && { color: "rgba(255,255,255,0.85)" }]}>{expiryLabel}</Text>
+          </View>
+        ) : null}
         {renderViewer()}
       </View>
     );
@@ -196,6 +235,12 @@ export function MediaBubble({
         <View style={styles.metaRow}>
           <Ionicons name="lock-closed" size={11} color={mine ? "rgba(255,255,255,0.85)" : C.muted} />
           <Text style={[styles.metaText, mine && { color: "rgba(255,255,255,0.85)" }]}>Saving off</Text>
+        </View>
+      ) : null}
+      {expiryLabel ? (
+        <View style={styles.metaRow}>
+          <Ionicons name="timer-outline" size={11} color={mine ? "rgba(255,255,255,0.85)" : C.warning} />
+          <Text style={[styles.metaText, mine && { color: "rgba(255,255,255,0.85)" }]}>{expiryLabel}</Text>
         </View>
       ) : null}
       {renderViewer()}

@@ -35,6 +35,7 @@ type Msg = {
   media_mime?: string;
   view_once?: boolean;
   allow_save?: boolean;
+  expires_at?: string | null;
   viewed?: boolean;
   created_at: string;
 };
@@ -54,6 +55,7 @@ export default function Chat() {
   const [permModal, setPermModal] = useState(false);
   const [viewOnce, setViewOnce] = useState(false);
   const [allowSave, setAllowSave] = useState(true);
+  const [expireSeconds, setExpireSeconds] = useState(0);
   const [uploading, setUploading] = useState(false);
   const listRef = useRef<FlatList<Msg>>(null);
   const lastTs = useRef<string | null>(null);
@@ -220,6 +222,7 @@ export default function Chat() {
         media_mime: media.media_mime,
         view_once: viewOnce,
         allow_save: allowSave,
+        expire_seconds: expireSeconds || null,
       });
       const m: Msg = res.message;
       lastTs.current = m.created_at;
@@ -231,6 +234,7 @@ export default function Chat() {
       setUploading(false);
       setViewOnce(false);
       setAllowSave(true);
+      setExpireSeconds(0);
     }
   };
 
@@ -432,6 +436,38 @@ export default function Chat() {
               </View>
             </Pressable>
 
+            <View style={styles.expireSection}>
+              <View style={styles.optLeft}>
+                <View style={styles.optIcon}>
+                  <Ionicons name="timer-outline" size={18} color={C.brandPrimary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.optTitle}>Auto-expire</Text>
+                  <Text style={styles.optSub}>Vanishes for both of you after…</Text>
+                </View>
+              </View>
+              <View style={styles.expireChips}>
+                {[
+                  { label: "Off", s: 0 },
+                  { label: "1h", s: 3600 },
+                  { label: "24h", s: 86400 },
+                  { label: "7d", s: 604800 },
+                ].map((opt) => {
+                  const on = expireSeconds === opt.s;
+                  return (
+                    <Pressable
+                      key={opt.label}
+                      testID={`media-expire-${opt.label}`}
+                      style={[styles.expireChip, on && styles.expireChipOn]}
+                      onPress={() => { Haptics.selectionAsync(); setExpireSeconds(opt.s); }}
+                    >
+                      <Text style={[styles.expireChipText, on && styles.expireChipTextOn]}>{opt.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             <View style={styles.pickRow}>
               <Pressable style={styles.pickBtn} onPress={() => sendMedia("image")} testID="media-pick-photo">
                 <Ionicons name="image" size={24} color={C.onBrandPrimary} />
@@ -599,6 +635,20 @@ const styles = StyleSheet.create({
   pickRow: { flexDirection: "row", gap: S.md, marginTop: S.lg },
   pickBtn: { flex: 1, backgroundColor: C.brandPrimary, borderRadius: R.lg, paddingVertical: S.lg, alignItems: "center", gap: S.xs },
   pickText: { fontFamily: F.semibold, fontSize: type.base, color: C.onBrandPrimary },
+  expireSection: { paddingVertical: S.md },
+  expireChips: { flexDirection: "row", gap: S.sm, marginTop: S.md },
+  expireChip: {
+    flex: 1,
+    paddingVertical: S.sm,
+    borderRadius: R.md,
+    backgroundColor: C.surfaceSecondary,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  expireChipOn: { backgroundColor: C.brandPrimary, borderColor: C.brandPrimary },
+  expireChipText: { fontFamily: F.semibold, fontSize: type.base, color: C.onSurfaceSecondary },
+  expireChipTextOn: { color: C.onBrandPrimary },
   modalScrim: { flex: 1, backgroundColor: "rgba(43,37,36,0.5)", alignItems: "center", justifyContent: "center", padding: S["2xl"] },
   modalCard: { backgroundColor: C.surface, borderRadius: R.lg, padding: S.xl, alignItems: "center", width: "100%" },
   modalIcon: {

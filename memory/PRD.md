@@ -59,6 +59,13 @@ rebuilt fresh for React Native / Expo + FastAPI + MongoDB, following the spec co
 - Backend GET /api/gallery (media-only, excludes system/text messages).
 - Tested: 48/48 backend pytest pass; new gallery/save/screenshot flows verified (device-only paths confirmed graceful on web).
 
+## Implemented — Round 4 (2026-06-25)
+- Auto-expire media: sender picks Off / 1h / 24h / 7d in the send modal; media vanishes for BOTH after the timer.
+  - Backend: expire_seconds on message → expires_at stored on message + media; GET /api/media/{id} returns 410 after expiry (marks consumed); GET /api/gallery filters out expired items.
+  - Frontend: expiry chips in media modal; MediaBubble shows "Vanishes in Xd/Xh/Xm" countdown and an "expired" placeholder once elapsed.
+- LiveKit Cloud credentials stored in backend/.env (LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET) for wiring real calling next (not yet wired).
+- Tested: backend auto-expire round-trip verified (download 200 → 410 after expiry; gallery drops expired).
+
 ## Backlog / Remaining
 - P0: Wire LiveKit for real E2E voice/video calling (device build + signaling).
 - P0: Screenshot/save blocking (platform-native, device build only).
