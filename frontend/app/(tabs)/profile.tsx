@@ -62,7 +62,7 @@ export default function Profile() {
           <Row
             icon="images-outline"
             title="Photo & video controls"
-            subtitle="Set save or view-once per item. (Full media coming soon.)"
+            subtitle="End-to-end encrypted, with per-item save & view-once."
           />
           <Divider />
           <Row

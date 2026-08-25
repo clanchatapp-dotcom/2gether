@@ -68,3 +68,29 @@ export async function decryptMessage(
     return null;
   }
 }
+
+// Binary (media) E2E encryption — same shared-key model as messages.
+export async function encryptBytes(
+  bytes: Uint8Array,
+  partnerPublicKey: string,
+): Promise<{ nonce: string; cipher: Uint8Array }> {
+  const secret = await getSecret();
+  if (!secret) throw new Error("Missing encryption key");
+  const nonce = nacl.randomBytes(nacl.box.nonceLength);
+  const cipher = nacl.box(bytes, nonce, util.decodeBase64(partnerPublicKey), secret);
+  return { nonce: util.encodeBase64(nonce), cipher };
+}
+
+export async function decryptBytes(
+  cipher: Uint8Array,
+  nonce: string,
+  partnerPublicKey: string,
+): Promise<Uint8Array | null> {
+  const secret = await getSecret();
+  if (!secret) return null;
+  try {
+    return nacl.box.open(cipher, util.decodeBase64(nonce), util.decodeBase64(partnerPublicKey), secret);
+  } catch {
+    return null;
+  }
+}

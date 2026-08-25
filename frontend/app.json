@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.clanchatmobile.zau5k2"
+      "bundleIdentifier": "com.emergent.clanchatmobile.zau5k2",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Share photos and videos privately with your partner",
+        "NSCalendarsUsageDescription": "Add your shared plans to your phone calendar",
+        "NSCalendarsFullAccessUsageDescription": "Add your shared plans to your phone calendar"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +23,8 @@
         "backgroundColor": "#FDFBF9"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.clanchatmobile.zau5k2"
+      "package": "com.emergent.clanchatmobile.zau5k2",
+      "permissions": ["READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_CALENDAR", "WRITE_CALENDAR"]
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +40,19 @@
           "imageWidth": 180,
           "resizeMode": "contain",
           "backgroundColor": "#FDFBF9"
+        }
+      ],
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Share photos and videos privately with your partner"
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Add your shared plans to your phone calendar"
         }
       ]
     ],

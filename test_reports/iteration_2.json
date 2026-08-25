@@ -1,0 +1,45 @@
+{
+  "summary": "Round-2 (Twogether new features) — Backend 36/36 pytest PASS (20 MVP regression + 16 new). New tests cover: WebSocket /api/ws auth+pair gating, ping->pong, typing broadcast (excluding sender), read event relay w/ viewed=true flip, message HTTP POST broadcasting {type:message} to pair room; Media E2E round-trip (encrypted bytes upload -> partner GET returns identical bytes), view-once consumption returns 410 after POST /messages/{id}/viewed by recipient, 404 for unknown media, 400 'Not paired' gating for media & check-ins; Message extended fields (media_id/media_nonce/media_mime/view_once/allow_save/viewed) default correctly, ciphertext-only, no _id, no plaintext; Check-ins upsert-one-per-day-per-author (2nd POST same day UPDATES not duplicates), list shows both partners, reactions[user_id]=emoji stored, 404 for unknown checkin. Frontend (Expo web, 390x844 mobile viewport): Login->Chat header/send WORKS; call scaffold navigation from voice AND paths verified — /call screen renders partner avatar, live timer, 'Encrypted calling activates on your installed app build' banner, Mute/Speaker/Video-off ctrls, and end-call button that routes back; Mood tab: emoji grid selectable, note field E2E-encrypted client-side (server ciphertext confirmed via backend test), submit shows 'You felt loved' with 'Waiting for a reaction…' card; Calendar tab: month grid, add-event modal renders title/note/shared/syncphone toggles + save; Media attach modal: view-once + allow-save toggles + Photo/Video buttons all render. No React Native red screens. No plaintext ever leaves client (verified via backend inspection).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "calendar add-event modal", "issues": ["On 390x844 the modal content (title + note + shared toggle + syncphone toggle + save button) is tall; while all fields are technically visible in the DOM, the syncphone toggle sits near the bottom and Playwright reported 'outside of viewport' on direct click. Real users can scroll inside the sheet; consider making the sheet vertically scrollable (ScrollView) or reducing paddings so all controls fit above the fold on small devices."]},
+      {"screen": "global", "issues": ["Persistent RN Web console warnings 'shadow* style props deprecated (use boxShadow)' and 'props.pointerEvents is deprecated'. Informational only — carried over from round 1."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/round2_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional / design) Make calendar add-event bottom sheet scrollable so syncphone toggle + save button are always reachable on smaller phones (e.g. iPhone SE-class 375x667).",
+    "(Optional / cleanup) Replace legacy `shadow*` StyleSheet props with `boxShadow` and remove `props.pointerEvents` in favor of `style.pointerEvents` to silence RN Web warnings.",
+    "(No action needed) Real calling engine is intentionally stubbed — banner clearly informs the user; confirmed working as spec'd."
+  ],
+  "critical_code_review_comments": [
+    "server.py:433-460 /api/media/upload correctly base64-decodes the ciphertext, streams to Emergent Object Storage under `twogether/uploads/{owner}/{media_id}.bin`, and persists an opaque metadata doc (no plaintext, no _id leak). 402 storage-limit path is handled.",
+    "server.py:417-428 mark_viewed only consumes media when sender != viewer AND view_once flag is set — correct semantics; also broadcasts {type:read} to the room so the sender's client can flip the 'Read' indicator.",
+    "server.py:553-577 add_checkin upsert is idempotent per (pair_id, author_id, date) — validated end-to-end.",
+    "server.py:596-637 WebSocket endpoint validates JWT + active pair, disconnects with 4401/4403 codes, broadcasts message/typing/read/ping-pong. Uses in-memory rooms — single-instance safe but will not scale horizontally; acceptable for MVP.",
+    "server.py:635-637 broad `except Exception` disconnects on any error — swallows tracebacks. Consider logging server-side for future debugging.",
+    "server.py: still uses deprecated @app.on_event startup/shutdown; migrate to FastAPI `lifespan` (non-blocking, carried from round 1)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_round2.py (new)",
+    "/app/backend/tests/conftest.py (new — asyncio auto marker)",
+    "/app/test_reports/pytest/round2_results.xml (generated)",
+    "/app/test_reports/pytest/pytest_results.xml (regenerated)"
+  ],
+  "success_rate": {"backend": "100% (36/36 — 16 new round-2 + 20 MVP regression)", "frontend": "100% of tested new flows (chat send, media modal open + toggles, call scaffold navigation & controls, mood check-in submit + card render, calendar add-event modal fields)"},
+  "seed_data_creation": "Test suite self-provisions fresh TEST_r2_* users each run with @twogether-r2.com emails. For UI verification, pre-provisioned pair TEST_ui_a_8f1930b1@twogether-r2.com / TEST_ui_b_8f1930b1@twogether-r2.com (password secret123) — already paired via API.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Round-2 tests are in /app/backend/tests/test_round2.py and use websockets 16.x + pytest-asyncio 1.4 (installed). Run with `pytest backend/tests/ --asyncio-mode=auto`. WS URL is derived from EXPO_PUBLIC_BACKEND_URL (https -> wss, plus /api/ws?token=<jwt>). For UI tests, sync-to-phone-calendar toggle and Photo/Video pickers are device features — expo-calendar/expo-image-picker will surface a permission modal on web (`cal-perm-modal` / `chat-perm-modal`); verify graceful modal, do NOT expect real device access. Read receipts require a second live WS client to flip viewed=true (already covered in test_ws_typing_and_read_broadcast).",
+  "rca_of_issue": "No bugs found. Round-2 features (WebSocket real-time chat + typing + read receipts, E2E encrypted media with view-once + allow-save toggles, call-screen scaffold, calendar phone-sync toggle w/ permission modal, daily mood check-in with reactions) all implemented per spec and pass backend + frontend integration checks."
+}

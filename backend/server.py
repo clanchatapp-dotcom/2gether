@@ -1,12 +1,15 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, WebSocket, WebSocketDisconnect, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import secrets
 import string
+import base64
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
@@ -26,6 +29,58 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 JWT_ALGO = 'HS256'
 TOKEN_DAYS = 30
+
+# ----------------------------- Object Storage (Emergent managed) -----------------------------
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "twogether"
+_storage_key = None
+
+
+def init_storage():
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    _storage_key = resp.json()["storage_key"]
+    return _storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    global _storage_key
+    key = init_storage()
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data,
+        timeout=120,
+    )
+    if resp.status_code == 503:
+        _storage_key = None
+        key = init_storage()
+        resp = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=data,
+            timeout=120,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str) -> bytes:
+    global _storage_key
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    if resp.status_code == 503:
+        _storage_key = None
+        key = init_storage()
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    resp.raise_for_status()
+    return resp.content
+
 
 app = FastAPI(title="Twogether API")
 api_router = APIRouter(prefix="/api")
@@ -62,18 +117,50 @@ def gen_code(n: int = 6) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
 
+def decode_token(token: str) -> Optional[str]:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+        return payload.get("sub")
+    except jwt.PyJWTError:
+        return None
+
+
 async def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
     if creds is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALGO])
-        user_id = payload.get("sub")
-    except jwt.PyJWTError:
+    user_id = decode_token(creds.credentials)
+    if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+# ----------------------------- Realtime (WebSocket) -----------------------------
+class ConnectionManager:
+    def __init__(self):
+        self.rooms: dict = {}  # pair_id -> list of {"user_id", "ws"}
+
+    async def connect(self, pair_id: str, user_id: str, ws: WebSocket):
+        await ws.accept()
+        self.rooms.setdefault(pair_id, []).append({"user_id": user_id, "ws": ws})
+
+    def disconnect(self, pair_id: str, ws: WebSocket):
+        conns = self.rooms.get(pair_id, [])
+        self.rooms[pair_id] = [c for c in conns if c["ws"] is not ws]
+
+    async def broadcast(self, pair_id: str, data: dict, exclude_ws: Optional[WebSocket] = None):
+        for c in list(self.rooms.get(pair_id, [])):
+            if exclude_ws is not None and c["ws"] is exclude_ws:
+                continue
+            try:
+                await c["ws"].send_json(data)
+            except Exception:
+                pass
+
+
+manager = ConnectionManager()
 
 
 def public_user(u: dict) -> dict:
@@ -112,9 +199,17 @@ class MessageIn(BaseModel):
     nonce: str
     ciphertext: str
     kind: str = "text"  # text | image | video
-    media_url: Optional[str] = None
+    media_id: Optional[str] = None
+    media_nonce: Optional[str] = None
+    media_mime: Optional[str] = None
     view_once: bool = False
     allow_save: bool = True
+
+
+class MediaUploadIn(BaseModel):
+    data_b64: str  # base64 of the ENCRYPTED (ciphertext) bytes
+    mime: str = "application/octet-stream"
+    kind: str = "image"
 
 
 class WorryIn(BaseModel):
@@ -128,6 +223,17 @@ class EventIn(BaseModel):
     date: str  # ISO date string
     shared: bool = True
     color: Optional[str] = None
+
+
+class CheckinIn(BaseModel):
+    date: str  # yyyy-mm-dd
+    mood: str = Field(min_length=1, max_length=40)
+    nonce: str = ""
+    ciphertext: str = ""
+
+
+class ReactIn(BaseModel):
+    emoji: str = Field(min_length=1, max_length=16)
 
 
 # ----------------------------- Auth -----------------------------
@@ -294,7 +400,9 @@ async def send_message(body: MessageIn, user=Depends(get_current_user)):
         "nonce": body.nonce,
         "ciphertext": body.ciphertext,
         "kind": body.kind,
-        "media_url": body.media_url,
+        "media_id": body.media_id,
+        "media_nonce": body.media_nonce,
+        "media_mime": body.media_mime,
         "view_once": body.view_once,
         "allow_save": body.allow_save,
         "viewed": False,
@@ -302,14 +410,69 @@ async def send_message(body: MessageIn, user=Depends(get_current_user)):
     }
     await db.messages.insert_one(msg)
     msg.pop("_id", None)
+    await manager.broadcast(pair["id"], {"type": "message", "message": msg})
     return {"message": msg}
 
 
 @api_router.post("/messages/{message_id}/viewed")
 async def mark_viewed(message_id: str, user=Depends(get_current_user)):
-    await require_active_pair(user)
+    pair = await require_active_pair(user)
+    m = await db.messages.find_one({"id": message_id, "pair_id": pair["id"]})
+    if not m:
+        raise HTTPException(status_code=404, detail="Message not found")
     await db.messages.update_one({"id": message_id}, {"$set": {"viewed": True}})
+    # For view-once media viewed by the recipient, consume the media so it can't be re-fetched.
+    if m.get("view_once") and m.get("media_id") and m.get("sender_id") != user["id"]:
+        await db.media.update_one({"id": m["media_id"]}, {"$set": {"consumed": True}})
+    await manager.broadcast(pair["id"], {"type": "read", "user_id": user["id"]}, exclude_ws=None)
     return {"ok": True}
+
+
+# ----------------------------- E2E Media -----------------------------
+@api_router.post("/media/upload")
+async def media_upload(body: MediaUploadIn, user=Depends(get_current_user)):
+    pair = await require_active_pair(user)
+    try:
+        raw = base64.b64decode(body.data_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid media data")
+    media_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/uploads/{user['id']}/{media_id}.bin"
+    try:
+        await run_in_threadpool(put_object, path, raw, "application/octet-stream")
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else 500
+        if code == 402:
+            raise HTTPException(status_code=402, detail="Storage limit reached")
+        raise HTTPException(status_code=502, detail="Upload failed")
+    doc = {
+        "id": media_id,
+        "pair_id": pair["id"],
+        "owner_id": user["id"],
+        "storage_path": path,
+        "mime": body.mime,
+        "kind": body.kind,
+        "size": len(raw),
+        "consumed": False,
+        "created_at": now_iso(),
+    }
+    await db.media.insert_one(doc)
+    return {"media_id": media_id}
+
+
+@api_router.get("/media/{media_id}")
+async def media_download(media_id: str, user=Depends(get_current_user)):
+    pair = await require_active_pair(user)
+    doc = await db.media.find_one({"id": media_id, "pair_id": pair["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Media not found")
+    if doc.get("consumed"):
+        raise HTTPException(status_code=410, detail="This media is no longer available")
+    try:
+        data = await run_in_threadpool(get_object, doc["storage_path"])
+    except Exception:
+        raise HTTPException(status_code=502, detail="Download failed")
+    return Response(content=data, media_type="application/octet-stream")
 
 
 # ----------------------------- Worries -----------------------------
@@ -379,8 +542,100 @@ async def delete_event(event_id: str, user=Depends(get_current_user)):
     return {"ok": True}
 
 
+# ----------------------------- Daily Check-in -----------------------------
+@api_router.get("/checkins")
+async def get_checkins(user=Depends(get_current_user)):
+    pair = await require_active_pair(user)
+    items = await db.checkins.find({"pair_id": pair["id"]}, {"_id": 0}).sort("created_at", -1).to_list(60)
+    return {"checkins": items}
+
+
+@api_router.post("/checkins")
+async def add_checkin(body: CheckinIn, user=Depends(get_current_user)):
+    pair = await require_active_pair(user)
+    existing = await db.checkins.find_one({"pair_id": pair["id"], "author_id": user["id"], "date": body.date})
+    if existing:
+        await db.checkins.update_one(
+            {"id": existing["id"]},
+            {"$set": {"mood": body.mood, "nonce": body.nonce, "ciphertext": body.ciphertext, "created_at": now_iso()}},
+        )
+        doc = await db.checkins.find_one({"id": existing["id"]}, {"_id": 0})
+    else:
+        doc = {
+            "id": str(uuid.uuid4()),
+            "pair_id": pair["id"],
+            "author_id": user["id"],
+            "date": body.date,
+            "mood": body.mood,
+            "nonce": body.nonce,
+            "ciphertext": body.ciphertext,
+            "reactions": {},
+            "created_at": now_iso(),
+        }
+        await db.checkins.insert_one(dict(doc))
+    await manager.broadcast(pair["id"], {"type": "checkin"})
+    return {"checkin": doc}
+
+
+@api_router.post("/checkins/{checkin_id}/react")
+async def react_checkin(checkin_id: str, body: ReactIn, user=Depends(get_current_user)):
+    pair = await require_active_pair(user)
+    c = await db.checkins.find_one({"id": checkin_id, "pair_id": pair["id"]})
+    if not c:
+        raise HTTPException(status_code=404, detail="Check-in not found")
+    await db.checkins.update_one({"id": checkin_id}, {"$set": {f"reactions.{user['id']}": body.emoji}})
+    doc = await db.checkins.find_one({"id": checkin_id}, {"_id": 0})
+    await manager.broadcast(pair["id"], {"type": "checkin"})
+    return {"checkin": doc}
+
+
 # ----------------------------- App wiring -----------------------------
 app.include_router(api_router)
+
+
+@app.websocket("/api/ws")
+async def ws_endpoint(websocket: WebSocket, token: str = ""):
+    user_id = decode_token(token)
+    if not user_id:
+        await websocket.close(code=4401)
+        return
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user or not user.get("pair_id"):
+        await websocket.close(code=4403)
+        return
+    pair = await db.pairs.find_one({"id": user["pair_id"]})
+    if not pair or pair.get("status") != "active":
+        await websocket.close(code=4403)
+        return
+    pair_id = pair["id"]
+    await manager.connect(pair_id, user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            t = data.get("type")
+            if t == "typing":
+                await manager.broadcast(
+                    pair_id,
+                    {"type": "typing", "user_id": user_id, "is_typing": bool(data.get("is_typing"))},
+                    exclude_ws=websocket,
+                )
+            elif t == "read":
+                await db.messages.update_many(
+                    {"pair_id": pair_id, "sender_id": {"$ne": user_id}, "viewed": False},
+                    {"$set": {"viewed": True}},
+                )
+                await manager.broadcast(
+                    pair_id,
+                    {"type": "read", "user_id": user_id},
+                    exclude_ws=websocket,
+                )
+            elif t == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        manager.disconnect(pair_id, websocket)
+    except Exception:
+        manager.disconnect(pair_id, websocket)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -402,6 +657,12 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.pairs.create_index("code")
     await db.messages.create_index([("pair_id", 1), ("created_at", 1)])
+    await db.media.create_index("id")
+    try:
+        await run_in_threadpool(init_storage)
+        logger.info("Object storage initialized")
+    except Exception as e:
+        logger.warning(f"Object storage init failed (will retry on demand): {e}")
 
 
 @app.on_event("shutdown")

@@ -37,21 +37,27 @@ rebuilt fresh for React Native / Expo + FastAPI + MongoDB, following the spec co
 ## Implemented (2026-06-25)
 - Email/password auth (register/login/JWT) + device keypair generation & sync.
 - Invite-code pairing: create code, redeem code, active-pair enforcement, unpair.
-- 1-to-1 E2E encrypted chat (send/receive, 3s polling, empty state, call modal stub).
+- 1-to-1 E2E encrypted chat (send/receive, empty state, call modal stub).
 - Worries space: E2E-encrypted notes, add + resolve.
 - Shared Calendar: month grid, per-day events, add (shared/personal) + delete.
 - Profile/"Us": pair card, privacy/security info, disconnect, sign out.
 - Branding: Twogether name, logo icon/splash, warm palette.
-- Tested: 20/20 backend pytest pass; full frontend E2E flow verified.
+
+## Implemented — Round 2 (2026-06-25)
+- Instant Delivery: WebSocket (/api/ws) real-time messages + typing indicator + read receipts (fallback 10s poll).
+- Photo/Video sharing: FULL E2E encrypted media (NaCl box on bytes) stored as ciphertext in Emergent Object Storage; per-item "view once" (410 after viewed) and "allow save" toggles; in-app image viewer + expo-video player.
+- Real Calling: full call-screen UI scaffold (/call) with mute/speaker/video/end controls + device-build banner (LiveKit engine to be wired later).
+- Calendar Sync: expo-calendar write to phone ("Also add to my phone calendar" + per-event sync) with permission handling.
+- Daily Check-in (Mood tab): mood emoji + optional E2E-encrypted note (one upsert per day); partner emoji reactions.
+- Tested: 36/36 backend pytest pass; all 5 frontend features verified by testing agent.
 
 ## Backlog / Remaining
-- P0: Real voice/video calling (WebRTC) — needs device build + signaling server.
+- P0: Wire LiveKit for real E2E voice/video calling (device build + signaling).
 - P0: Screenshot/save blocking (platform-native, device build only).
-- P1: Photo/video sharing with per-item save & view-once enforcement (Object Storage).
-- P1: Native phone-calendar sync (read/write) for the shared calendar.
-- P1: Real-time messaging (WebSockets) instead of 3s polling; typing/read receipts.
+- P1: Two-way calendar sync (import phone events into shared calendar).
+- P1: Multi-device E2E key sync + key-verification/fingerprint UX.
 - P2: Push notifications (on user request; needs device build).
-- P2: Key-verification/fingerprint UX for E2E identity assurance; multi-device key sync.
+- P2: Media thumbnails/compression for large videos; download-to-gallery when allow_save is on.
 
 ## Next Tasks
 - Add photo/video sharing with view-once controls (Emergent Object Storage).

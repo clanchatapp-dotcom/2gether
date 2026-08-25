@@ -13,7 +13,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Linking } from "react-native";
 import { api } from "@/src/lib/api";
+import { syncEventToPhone } from "@/src/lib/calendarSync";
 import { C, F, S, R, type } from "@/src/theme/theme";
 
 type EventItem = {
@@ -49,6 +51,9 @@ export default function Calendar() {
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [shared, setShared] = useState(true);
+  const [syncPhone, setSyncPhone] = useState(false);
+  const [permModal, setPermModal] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -88,12 +93,29 @@ export default function Calendar() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await api.addEvent({ title: title.trim(), note: note.trim() || null, date: selected, shared });
+      if (syncPhone) {
+        const r = await syncEventToPhone(title.trim(), selected, note.trim());
+        if (!r.ok && r.reason === "permission") setPermModal(true);
+        else if (r.ok) showToast("Added to your phone calendar");
+      }
       setTitle("");
       setNote("");
       setShared(true);
       setModal(false);
       load();
     } catch {}
+  };
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
+
+  const syncOne = async (ev: EventItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const r = await syncEventToPhone(ev.title, ev.date, ev.note);
+    if (!r.ok && r.reason === "permission") setPermModal(true);
+    else if (r.ok) showToast("Added to your phone calendar");
   };
 
   const removeEvent = async (id: string) => {
@@ -197,6 +219,9 @@ export default function Calendar() {
                 <Text style={styles.eventTitle}>{e.title}</Text>
                 {e.note ? <Text style={styles.eventNote}>{e.note}</Text> : null}
               </View>
+              <Pressable testID={`event-sync-${e.id}`} onPress={() => syncOne(e)} hitSlop={8} style={{ marginRight: S.sm }}>
+                <Ionicons name="phone-portrait-outline" size={18} color={C.brandPrimary} />
+              </Pressable>
               <Pressable testID={`event-delete-${e.id}`} onPress={() => removeEvent(e.id)} hitSlop={8}>
                 <Ionicons name="close" size={18} color={C.muted} />
               </Pressable>
@@ -204,6 +229,13 @@ export default function Calendar() {
           ))
         )}
       </ScrollView>
+
+      {toast ? (
+        <View style={[styles.toast, { bottom: insets.bottom + 150 }]} testID="cal-toast">
+          <Ionicons name="checkmark-circle" size={16} color="#fff" />
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      ) : null}
 
       <Pressable
         testID="cal-add-button"
@@ -224,6 +256,7 @@ export default function Calendar() {
           <Pressable style={{ flex: 1 }} onPress={() => setModal(false)} />
           <View style={[styles.sheet, { paddingBottom: insets.bottom + S.lg }]} testID="cal-add-modal">
             <View style={styles.sheetHandle} />
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={styles.sheetTitle}>New plan</Text>
             <Text style={styles.sheetDate}>{fmtLong(selected)}</Text>
             <TextInput
@@ -249,11 +282,36 @@ export default function Calendar() {
               </View>
               <Text style={styles.toggleText}>Shared date (we're both in)</Text>
             </Pressable>
+            <Pressable style={styles.toggleRow} onPress={() => setSyncPhone((s) => !s)} testID="event-syncphone-toggle">
+              <View style={[styles.checkbox, syncPhone && styles.checkboxOn]}>
+                {syncPhone ? <Ionicons name="checkmark" size={14} color={C.onBrandPrimary} /> : null}
+              </View>
+              <Text style={styles.toggleText}>Also add to my phone calendar</Text>
+            </Pressable>
             <Pressable testID="event-save-button" style={styles.saveBtn} onPress={addEvent}>
               <Text style={styles.saveText}>Add to calendar</Text>
             </Pressable>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={permModal} transparent animationType="fade" onRequestClose={() => setPermModal(false)}>
+        <Pressable style={styles.permScrim} onPress={() => setPermModal(false)}>
+          <View style={styles.permCard} testID="cal-perm-modal">
+            <View style={styles.permIcon}>
+              <Ionicons name="calendar" size={26} color={C.brandPrimary} />
+            </View>
+            <Text style={styles.permTitle}>Allow calendar access</Text>
+            <Text style={styles.permText}>
+              To add plans to your phone calendar, Twogether needs calendar permission. Enable it in
+              Settings.
+            </Text>
+            <Pressable style={styles.permBtn} onPress={() => { setPermModal(false); Linking.openSettings(); }}>
+              <Text style={styles.permBtnText}>Open Settings</Text>
+            </Pressable>
+          </View>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -326,7 +384,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sheetScrim: { flex: 1, backgroundColor: "rgba(43,37,36,0.5)" },
-  sheet: { backgroundColor: C.surface, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg, padding: S.xl },
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg, padding: S.xl, maxHeight: "85%" },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderStrong, alignSelf: "center", marginBottom: S.lg },
   sheetTitle: { fontFamily: F.bold, fontSize: type.xl, color: C.onSurface },
   sheetDate: { fontFamily: F.regular, fontSize: type.base, color: C.onSurfaceSecondary, marginBottom: S.lg },
@@ -356,4 +414,23 @@ const styles = StyleSheet.create({
   toggleText: { fontFamily: F.medium, fontSize: type.base, color: C.onSurface },
   saveBtn: { backgroundColor: C.brandPrimary, borderRadius: R.lg, paddingVertical: S.lg, alignItems: "center" },
   saveText: { fontFamily: F.semibold, fontSize: type.lg, color: C.onBrandPrimary },
+  toast: {
+    position: "absolute",
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: S.sm,
+    backgroundColor: C.surfaceInverse,
+    paddingHorizontal: S.lg,
+    paddingVertical: S.md,
+    borderRadius: R.pill,
+  },
+  toastText: { fontFamily: F.medium, fontSize: type.base, color: C.onSurfaceInverse },
+  permScrim: { flex: 1, backgroundColor: "rgba(43,37,36,0.5)", alignItems: "center", justifyContent: "center", padding: S["2xl"] },
+  permCard: { backgroundColor: C.surface, borderRadius: R.lg, padding: S.xl, alignItems: "center", width: "100%" },
+  permIcon: { width: 60, height: 60, borderRadius: R.pill, backgroundColor: C.brandTertiary, alignItems: "center", justifyContent: "center", marginBottom: S.lg },
+  permTitle: { fontFamily: F.bold, fontSize: type.xl, color: C.onSurface, marginBottom: S.sm },
+  permText: { fontFamily: F.regular, fontSize: type.base, color: C.onSurfaceSecondary, textAlign: "center", lineHeight: 22, marginBottom: S.xl },
+  permBtn: { backgroundColor: C.brandPrimary, borderRadius: R.lg, paddingVertical: S.md, paddingHorizontal: S["2xl"], alignSelf: "stretch", alignItems: "center" },
+  permBtnText: { fontFamily: F.semibold, fontSize: type.lg, color: C.onBrandPrimary },
 });

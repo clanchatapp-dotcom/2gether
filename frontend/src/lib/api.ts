@@ -41,6 +41,9 @@ export const api = {
   getMessages: (after?: string) =>
     req("/messages" + (after ? `?after=${encodeURIComponent(after)}` : "")),
   sendMessage: (body: any) => req("/messages", { method: "POST", body: JSON.stringify(body) }),
+  markViewed: (id: string) => req(`/messages/${id}/viewed`, { method: "POST" }),
+  uploadMedia: (data_b64: string, mime: string, kind: string) =>
+    req("/media/upload", { method: "POST", body: JSON.stringify({ data_b64, mime, kind }) }),
 
   getWorries: () => req("/worries"),
   addWorry: (body: any) => req("/worries", { method: "POST", body: JSON.stringify(body) }),
@@ -49,4 +52,9 @@ export const api = {
   getEvents: () => req("/events"),
   addEvent: (body: any) => req("/events", { method: "POST", body: JSON.stringify(body) }),
   deleteEvent: (id: string) => req(`/events/${id}`, { method: "DELETE" }),
+
+  getCheckins: () => req("/checkins"),
+  addCheckin: (body: any) => req("/checkins", { method: "POST", body: JSON.stringify(body) }),
+  reactCheckin: (id: string, emoji: string) =>
+    req(`/checkins/${id}/react`, { method: "POST", body: JSON.stringify({ emoji }) }),
 };
