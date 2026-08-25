@@ -59,4 +59,5 @@ export const api = {
     req(`/checkins/${id}/react`, { method: "POST", body: JSON.stringify({ emoji }) }),
 
   getGallery: () => req("/gallery"),
+  livekitToken: () => req("/livekit/token", { method: "POST" }),
 };

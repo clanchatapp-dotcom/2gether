@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
+from livekit import api as lk_api
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -29,6 +30,10 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 JWT_ALGO = 'HS256'
 TOKEN_DAYS = 30
+
+LIVEKIT_URL = os.environ.get("LIVEKIT_URL")
+LIVEKIT_API_KEY = os.environ.get("LIVEKIT_API_KEY")
+LIVEKIT_API_SECRET = os.environ.get("LIVEKIT_API_SECRET")
 
 # ----------------------------- Object Storage (Emergent managed) -----------------------------
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -394,9 +399,7 @@ async def get_messages(after: Optional[str] = None, user=Depends(get_current_use
 @api_router.post("/messages")
 async def send_message(body: MessageIn, user=Depends(get_current_user)):
     pair = await require_active_pair(user)
-    expires_at = None
-    if body.expire_seconds and body.expire_seconds > 0:
-        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=body.expire_seconds)).isoformat()
+    expire_seconds = body.expire_seconds if (body.expire_seconds and body.expire_seconds > 0) else None
     msg = {
         "id": str(uuid.uuid4()),
         "pair_id": pair["id"],
@@ -409,14 +412,15 @@ async def send_message(body: MessageIn, user=Depends(get_current_user)):
         "media_mime": body.media_mime,
         "view_once": body.view_once,
         "allow_save": body.allow_save,
-        "expires_at": expires_at,
+        "expire_seconds": expire_seconds,  # timer starts when partner first opens
+        "expires_at": None,
         "viewed": False,
         "created_at": now_iso(),
     }
     await db.messages.insert_one(msg)
     msg.pop("_id", None)
-    if expires_at and body.media_id:
-        await db.media.update_one({"id": body.media_id}, {"$set": {"expires_at": expires_at}})
+    if expire_seconds and body.media_id:
+        await db.media.update_one({"id": body.media_id}, {"$set": {"expire_seconds": expire_seconds}})
     await manager.broadcast(pair["id"], {"type": "message", "message": msg})
     return {"message": msg}
 
@@ -478,6 +482,12 @@ async def media_download(media_id: str, user=Depends(get_current_user)):
     if doc.get("expires_at") and now_iso() > doc["expires_at"]:
         await db.media.update_one({"id": media_id}, {"$set": {"consumed": True}})
         raise HTTPException(status_code=410, detail="This media has expired")
+    # Start the auto-expire timer when the RECIPIENT (not the sender) first opens it.
+    if not doc.get("expires_at") and doc.get("expire_seconds") and doc.get("owner_id") != user["id"]:
+        exp = (datetime.now(timezone.utc) + timedelta(seconds=int(doc["expire_seconds"]))).isoformat()
+        await db.media.update_one({"id": media_id}, {"$set": {"expires_at": exp}})
+        await db.messages.update_many({"media_id": media_id}, {"$set": {"expires_at": exp}})
+        await manager.broadcast(pair["id"], {"type": "expiry_started", "media_id": media_id, "expires_at": exp})
     try:
         data = await run_in_threadpool(get_object, doc["storage_path"])
     except Exception:
@@ -565,6 +575,31 @@ async def delete_event(event_id: str, user=Depends(get_current_user)):
     await require_active_pair(user)
     await db.events.delete_one({"id": event_id})
     return {"ok": True}
+
+
+# ----------------------------- LiveKit calling -----------------------------
+@api_router.post("/livekit/token")
+async def livekit_token(user=Depends(get_current_user)):
+    pair = await require_active_pair(user)
+    if not (LIVEKIT_URL and LIVEKIT_API_KEY and LIVEKIT_API_SECRET):
+        raise HTTPException(status_code=503, detail="Calling is not configured")
+    room = f"pair_{pair['id']}"
+    token = (
+        lk_api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+        .with_identity(user["id"])
+        .with_name(user.get("display_name") or "Partner")
+        .with_ttl(timedelta(minutes=30))
+        .with_grants(
+            lk_api.VideoGrants(
+                room_join=True,
+                room=room,
+                can_publish=True,
+                can_subscribe=True,
+            )
+        )
+        .to_jwt()
+    )
+    return {"server_url": LIVEKIT_URL, "token": token, "room": room}
 
 
 # ----------------------------- Daily Check-in -----------------------------

@@ -20,6 +20,7 @@ type Msg = {
   media_mime?: string;
   view_once?: boolean;
   allow_save?: boolean;
+  expire_seconds?: number | null;
   expires_at?: string | null;
   viewed?: boolean;
   sender_id: string;
@@ -51,13 +52,20 @@ export function MediaBubble({
   }, [expiresMs]);
 
   const expiryLabel = (() => {
-    if (!expiresMs || expired) return null;
-    const rem = Math.max(0, expiresMs - now);
-    const h = Math.floor(rem / 3600000);
-    const d = Math.floor(h / 24);
-    if (d >= 1) return `Vanishes in ${d}d`;
-    if (h >= 1) return `Vanishes in ${h}h`;
-    return `Vanishes in ${Math.max(1, Math.floor(rem / 60000))}m`;
+    if (expiresMs && !expired) {
+      const rem = Math.max(0, expiresMs - now);
+      const h = Math.floor(rem / 3600000);
+      const d = Math.floor(h / 24);
+      if (d >= 1) return `Vanishes in ${d}d`;
+      if (h >= 1) return `Vanishes in ${h}h`;
+      return `Vanishes in ${Math.max(1, Math.floor(rem / 60000))}m`;
+    }
+    if (!expiresMs && msg.expire_seconds) {
+      const s = msg.expire_seconds;
+      const label = s >= 604800 ? "7d" : s >= 86400 ? "24h" : s >= 3600 ? "1h" : `${Math.round(s / 60)}m`;
+      return `Vanishes ${label} after opening`;
+    }
+    return null;
   })();
 
   const [uri, setUri] = useState<string | null>(null);

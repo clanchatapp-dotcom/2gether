@@ -66,6 +66,14 @@ rebuilt fresh for React Native / Expo + FastAPI + MongoDB, following the spec co
 - LiveKit Cloud credentials stored in backend/.env (LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET) for wiring real calling next (not yet wired).
 - Tested: backend auto-expire round-trip verified (download 200 → 410 after expiry; gallery drops expired).
 
+## Implemented — Round 5 (2026-06-25)
+- Expiry-after-view: media auto-expire timer now starts when the RECIPIENT first opens it (not at send). expire_seconds stored on send; expires_at set on first non-owner /api/media GET; WS 'expiry_started' broadcast updates both clients' countdowns live. MediaBubble shows "Vanishes {1h/24h/7d} after opening" pre-open, then live countdown, then expired placeholder.
+- LiveKit calling (real E2E voice/video):
+  - Backend POST /api/livekit/token mints a room token (room = pair_<pairId>) via livekit-api using LIVEKIT_URL/KEY/SECRET in .env; both partners join the same room; 400 if unpaired.
+  - Frontend src/components/LiveCall.tsx (@livekit/react-native) joins room, publishes audio/video, mute/camera/end, remote + local PIP video; loaded ONLY on a device build (guarded via expo-constants executionEnvironment + Platform); web stub keeps the web/Expo Go bundle clean; app/call.tsx renders LiveCall on device builds, scaffold+banner otherwise.
+  - Permissions added (camera/mic on iOS+Android); config plugins @livekit/react-native-expo-plugin + @config-plugins/react-native-webrtc.
+- Tested: 65/65 backend pytest pass (expiry-after-view state machine + livekit token verified). Calling UI is device-build only.
+
 ## Backlog / Remaining
 - P0: Wire LiveKit for real E2E voice/video calling (device build + signaling).
 - P0: Screenshot/save blocking (platform-native, device build only).

@@ -1,0 +1,39 @@
+{
+  "summary": "Round-4 backend testing (Twogether: expiry-after-view + LiveKit token). 65/65 pytest PASS (20 MVP + 16 round2 + 12 round3 + 17 new round4). New round-4 file (/app/backend/tests/test_round4_expiry_livekit.py) fully validates: (1) EXPIRY-AFTER-VIEW state machine — POST /api/messages with expire_seconds>0 stores expire_seconds and expires_at=null (timer NOT started at send); owner (sender) GET /api/media/{id} does NOT start the timer and is repeatable with byte-exact download; recipient's FIRST GET /api/media/{id} atomically sets expires_at=now+expire_seconds, returns bytes 200, and broadcasts a WebSocket {type:'expiry_started', media_id, expires_at} to the pair room (verified by subscribing over /api/ws and capturing the event); a second recipient GET does NOT reset expires_at (stable timer); after expiry (expire_seconds=1, wait >2s) GET /api/media/{id} returns 410 for BOTH sender and recipient and the message is EXCLUDED from /api/gallery for both. (2) Regressions: media without expire_seconds behaves as before (no expiry, unlimited views); view_once still returns 410 after mark viewed by recipient; 1KB random ciphertext preserved byte-exact through upload→download. (3) LIVEKIT TOKEN — POST /api/livekit/token for paired user returns {server_url: wss://..., token: valid JWT decoded with identity=user_id and video.room=pair_<pairId> and roomJoin=true, room: 'pair_<pairId>'}; both partners get the SAME room string and same server_url but different tokens; solo (unpaired) user gets 400 'Not paired'; unauthenticated request gets 401. (4) Regression suite still green: auth (register/login/me/duplicate/wrong-pw/public-key update), pairing (create idempotent-pending / redeem / invalid code 404 / self-pair 400 / already-active 400 / active GET with partner), messages send+list+after filter, WebSocket typing broadcast to partner + ping→pong echo, worries create+list+resolve, events create+list+delete, checkins upsert-per-day + react, gallery (media-only, excludes system + excludes expired). No backend issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_round4_expiry_livekit.py",
+    "/app/backend/tests/test_round3_gallery.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/round4_results.xml"
+  ],
+  "action_items": [
+    "None — backend implementation is correct and complete for both new features. As noted in the request, frontend calling (LiveCall / @livekit/react-native) is device-build-only and was intentionally not tested here."
+  ],
+  "critical_code_review_comments": [
+    "server.py:399-425 send_message: correctly gates expire_seconds>0 (else stored as None), initializes expires_at=None, and mirrors expire_seconds onto the media doc only when both expire_seconds AND media_id are present. Timer NOT started at send. ✅",
+    "server.py:474-495 media_download: the state-machine is atomic and correct — (a) 410 if already consumed, (b) 410 if expires_at is set AND now > expires_at (also flips consumed=true so both sides get 410 after), (c) starts timer ONLY IF expires_at is null AND expire_seconds set AND owner_id != user_id (i.e., recipient viewing for the first time), (d) writes expires_at to both media doc AND all matching messages, (e) broadcasts expiry_started over WS, (f) then streams the bytes. Order guarantees the 'first-recipient-view' semantic. ✅",
+    "server.py:498-510 /api/gallery: filters {media_id: {$ne: None}, $or: [expires_at=None, expires_at>now]} — expired items automatically hidden without a sweep. Correct.",
+    "server.py:581-602 /api/livekit/token: mints a LiveKit JWT via livekit-api SDK with identity=user_id, VideoGrants(room=pair_<pairId>, room_join=True, can_publish=True, can_subscribe=True), 30-minute TTL. Deterministic room name derived from pair_id ensures both partners join the same room. 503 if LiveKit env vars missing; 400 'Not paired' via require_active_pair; 401 via bearer dep. ✅",
+    "test_round4_expiry_livekit.py WebSocket tests use asyncio.new_event_loop() explicitly to avoid RuntimeError('no current event loop') when running alongside pytest-asyncio tests in the full suite."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_round4_expiry_livekit.py (new — 17 tests)",
+    "/app/test_reports/pytest/round4_results.xml (new)",
+    "/app/test_reports/pytest/pytest_results.xml (regenerated — 65/65 pass)"
+  ],
+  "success_rate": {"backend": "100% (65/65 — 20 MVP + 16 round2 + 12 round3 + 17 round4)", "frontend": "N/A (backend-only round per request)"},
+  "seed_data_creation": "Ephemeral: each fixture-scoped test run creates 2 fresh @twogether-r4.com users + 1 solo user + an active pair; tests upload multiple small ciphertexts and expire some via expire_seconds=1 waits. No persistent seed data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend contract for expiry-after-view is: message.expire_seconds set at send, message.expires_at & media.expires_at = null until the RECIPIENT (owner_id != user_id) first GETs /api/media/{id}, at which point BOTH docs get expires_at=now+expire_seconds AND a WS 'expiry_started' fires; subsequent recipient GETs do NOT reset the timer; owner GETs never start it; after expiry both sides get 410 and gallery hides it. LiveKit token endpoint uses livekit-api 1.2.0 SDK — env vars LIVEKIT_URL/API_KEY/API_SECRET must be present (they are in /app/backend/.env). Room name is deterministic: 'pair_' + pair_id. Frontend calling with @livekit/react-native only runs on device builds, do not attempt to test it via Expo web preview.",
+  "rca_of_issue": "N/A — no bugs found. One minor test-harness quirk (needed asyncio.new_event_loop() instead of asyncio.get_event_loop() to be compatible with pytest-asyncio's loop closure in the full suite) was fixed in the round-4 test file itself."
+}

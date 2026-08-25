@@ -1,14 +1,49 @@
 import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/src/context/AuthContext";
 import { C, F, S, R, type } from "@/src/theme/theme";
 
+// Real LiveKit calling only runs in a development/production build (not Expo Go / web).
+const CAN_CALL = Platform.OS !== "web" && Constants.executionEnvironment !== "storeClient";
+let LiveCall: any = null;
+if (CAN_CALL) {
+  try {
+    LiveCall = require("@/src/components/LiveCall").default;
+  } catch {
+    LiveCall = null;
+  }
+}
+
 export default function CallScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { partner } = useAuth();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isVideo = mode === "video";
+
+  // On a real device build, render the live call engine.
+  if (CAN_CALL && LiveCall) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.surfaceInverse }}>
+        <LiveCall
+          isVideo={isVideo}
+          partnerName={partner?.display_name || "Your partner"}
+          onEnd={() => router.back()}
+        />
+      </View>
+    );
+  }
+
+  return <CallScaffold />;
+}
+
+function CallScaffold() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { partner } = useAuth();
@@ -20,7 +55,6 @@ export default function CallScreen() {
   const [speaker, setSpeaker] = useState(true);
   const [seconds, setSeconds] = useState(0);
 
-  // Placeholder "connecting" timer — real media session wires in on a device build (LiveKit).
   useEffect(() => {
     const t = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(t);

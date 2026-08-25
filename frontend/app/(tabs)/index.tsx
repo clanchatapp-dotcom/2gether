@@ -35,6 +35,7 @@ type Msg = {
   media_mime?: string;
   view_once?: boolean;
   allow_save?: boolean;
+  expire_seconds?: number | null;
   expires_at?: string | null;
   viewed?: boolean;
   created_at: string;
@@ -127,6 +128,10 @@ export default function Chat() {
         if (e.user_id !== user?.id) setPartnerTyping(!!e.is_typing);
       } else if (e.type === "read") {
         if (e.user_id !== user?.id) setReadAll(true);
+      } else if (e.type === "expiry_started") {
+        setMessages((prev) =>
+          prev.map((m) => (m.media_id === e.media_id ? { ...m, expires_at: e.expires_at } : m)),
+        );
       }
     },
     [user, partner],
@@ -443,7 +448,7 @@ export default function Chat() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optTitle}>Auto-expire</Text>
-                  <Text style={styles.optSub}>Vanishes for both of you after…</Text>
+                  <Text style={styles.optSub}>Vanishes after your partner opens it</Text>
                 </View>
               </View>
               <View style={styles.expireChips}>
