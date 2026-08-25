@@ -74,6 +74,13 @@ rebuilt fresh for React Native / Expo + FastAPI + MongoDB, following the spec co
   - Permissions added (camera/mic on iOS+Android); config plugins @livekit/react-native-expo-plugin + @config-plugins/react-native-webrtc.
 - Tested: 65/65 backend pytest pass (expiry-after-view state machine + livekit token verified). Calling UI is device-build only.
 
+## Implemented — Round 6 (2026-06-25)
+- Incoming Call Ring: global CallProvider (mounted in tabs layout) opens its own WebSocket so an incoming call rings from ANY tab. Caller taps voice/video → WS 'call_invite' (with caller name + mode) → partner sees a full-screen ringing screen (Accept/Decline, vibration + haptics). Accept → both join the LiveKit room; Decline → caller gets a "Call declined" toast. Backend relays call_invite/cancel/accept/decline over /api/ws.
+- Verified over live WebSocket (invite + decline round-trip).
+
+## Deployment / builds (platform)
+- Push to GitHub: use the "Save to GitHub" button (paid plans). Android APK/AAB + iOS builds: Publish (top-right) → Deploy → Publish to Play Store / App Store. No EAS CLI or external tooling — Emergent manages Expo/EAS. eas.json is Emergent-managed and untouched.
+
 ## Backlog / Remaining
 - P0: Wire LiveKit for real E2E voice/video calling (device build + signaling).
 - P0: Screenshot/save blocking (platform-native, device build only).

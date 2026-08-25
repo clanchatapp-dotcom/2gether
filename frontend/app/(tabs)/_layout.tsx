@@ -3,10 +3,12 @@ import { Platform, StyleSheet, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { CallProvider } from "@/src/context/CallContext";
 import { C, F } from "@/src/theme/theme";
 
 export default function TabsLayout() {
   return (
+    <CallProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -69,5 +71,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </CallProvider>
   );
 }

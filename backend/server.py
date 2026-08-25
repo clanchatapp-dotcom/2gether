@@ -691,6 +691,17 @@ async def ws_endpoint(websocket: WebSocket, token: str = ""):
                 )
             elif t == "ping":
                 await websocket.send_json({"type": "pong"})
+            elif t in ("call_invite", "call_cancel", "call_accept", "call_decline"):
+                await manager.broadcast(
+                    pair_id,
+                    {
+                        "type": t,
+                        "user_id": user_id,
+                        "name": user.get("display_name") or "Your partner",
+                        "mode": data.get("mode") or "voice",
+                    },
+                    exclude_ws=websocket,
+                )
     except WebSocketDisconnect:
         manager.disconnect(pair_id, websocket)
     except Exception:

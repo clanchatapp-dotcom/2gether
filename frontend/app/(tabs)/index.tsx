@@ -17,6 +17,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/src/context/AuthContext";
+import { useCall } from "@/src/context/CallContext";
 import { api } from "@/src/lib/api";
 import { useRealtime } from "@/src/lib/realtime";
 import { encryptMessage, decryptMessage } from "@/src/lib/crypto";
@@ -45,6 +46,7 @@ export default function Chat() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, partner } = useAuth();
+  const { startCall } = useCall();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState("");
@@ -323,10 +325,10 @@ export default function Chat() {
         <Pressable testID="chat-gallery" style={styles.callBtn} onPress={() => router.push("/gallery")}>
           <Ionicons name="images" size={19} color={C.brandPrimary} />
         </Pressable>
-        <Pressable testID="chat-voice-call" style={styles.callBtn} onPress={() => router.push("/call?mode=voice")}>
+        <Pressable testID="chat-voice-call" style={styles.callBtn} onPress={() => startCall("voice")}>
           <Ionicons name="call" size={20} color={C.brandPrimary} />
         </Pressable>
-        <Pressable testID="chat-video-call" style={styles.callBtn} onPress={() => router.push("/call?mode=video")}>
+        <Pressable testID="chat-video-call" style={styles.callBtn} onPress={() => startCall("video")}>
           <Ionicons name="videocam" size={20} color={C.brandPrimary} />
         </Pressable>
       </View>
