@@ -1,0 +1,34 @@
+{
+  "summary": "Round 6 — Verified the in-app 'Server address' override fix and confirmed normal auth still works. All 20 backend pytest cases PASS on EXPO_PUBLIC_BACKEND_URL=https://clanchat-mobile-1.preview.emergentagent.com (register, login-ok/401, /me, public-key update, pair create/redeem/get, messages, worries, events). Direct curl with the real owner creds (thomasgallacher92@gmail.com / Ladyinred_1) -> POST /api/auth/login returned 200 (with wrong pw -> 401). Frontend UI (Expo web preview at 375x667): /login shows the new 'Connection problem? Server settings' toggle (login-server-toggle). Tapping it reveals login-server-input pre-filled with the current host ('https://clanchat-mobile-1.preview.emergentagent.com'). Entering a value with a trailing '/api/' and tapping 'Save server' (login-server-save) triggered normalizeHost() and displayed login-server-note = 'Server set to https://clanchat-mobile-1.preview.emergentagent.com' (both trailing slash and /api were correctly stripped). Persistence verified via window.localStorage['tw_api_base_v1'] = '\"https://clanchat-mobile-1.preview.emergentagent.com\"'. Wrong-password submit surfaces 'Incorrect email or password' (auth error, NOT 'Network request failed'). Correct-password submit with the real user succeeded and navigated to /pair showing 'Hi Tam' — full end-to-end sign-in path works. Regression: /welcome loads (welcome-screen), and both welcome-get-started-button (-> /register) and welcome-login-link (-> /login) still navigate correctly. No react-native red screen, no console errors (only unrelated 'shadow* deprecated' and 'expo-notifications web' warnings).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/test_round3_gallery.py",
+    "/app/backend/tests/test_round4_expiry_livekit.py",
+    "/app/test_reports/pytest/round5_results.xml"
+  ],
+  "action_items": [
+    "None — the server-override fix and regular auth flow are working. When the user rebuilds their APK, ensure the EAS/GH-Actions build secret EXPO_PUBLIC_BACKEND_URL matches the CURRENT preview URL, so the baked-in default is not stale (the in-app override is the safety net for when it does drift)."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/src/lib/config.ts normalizeHost() correctly strips a trailing '/api' and trailing slashes and adds https:// when missing — verified live: input 'https://clanchat-mobile-1.preview.emergentagent.com/api/' persisted as 'https://clanchat-mobile-1.preview.emergentagent.com'. Good.",
+    "loadApiBase() is awaited from AuthProvider.boot() before api.getToken(), so the override is in effect for the very first /me call on cold start. Good ordering.",
+    "getApiBase() appends '/api', and normalizeHost() strips it from user input — guaranteed no '/api/api' double-prefix. Good.",
+    "Login screen exposes proper testIDs (login-server-toggle/input/save/note, login-error, login-submit-button) — great for testability and future regression.",
+    "api.ts req() re-raises fetch/network errors as-is, so any 'Network request failed' string on device is a genuine TypeError from fetch (DNS/TLS/wrong host) — the new UI override is the correct mitigation."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (20/20 pytest incl. auth/login-ok+401)", "frontend": "100% (server-settings toggle+save+persist, wrong-pw error, real-user sign-in -> /pair, welcome regression)"},
+  "seed_data_creation": "Used the real owner account (thomasgallacher92@gmail.com / Ladyinred_1) as instructed. Pytest fixture creates ephemeral TEST_* accounts under @twogether-test.com — safe, isolated. LocalStorage tw_api_base_v1 was set to the same value that env already resolves to and then cleared during the /welcome test, so no lingering override remains in the preview.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The server-override feature (config.ts + login.tsx) is verified in the Expo web preview. Any future 'Network request failed' on device is expected to be a bad baked-in EXPO_PUBLIC_BACKEND_URL and can now be fixed on-device via the login screen's 'Connection problem? Server settings' panel. Do not modify config.ts / api.ts / login.tsx — they are correct.",
+  "rca_of_issue": "Original device-side 'Network request failed' RCA (confirmed prior round): stale EXPO_PUBLIC_BACKEND_URL baked into the APK bundle at build time. Fix in this round: an on-device override (AsyncStorage key tw_api_base_v1) surfaced through the login screen, loaded at boot before the first API call, with normalizeHost() sanitising user input (adds https://, strips trailing /, strips trailing /api). Verified: prefill, save, persistence, and that normal auth (both success and 401) still works via the UI and via direct backend calls."
+}
