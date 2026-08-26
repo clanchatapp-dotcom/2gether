@@ -26,7 +26,8 @@
         "backgroundColor": "#FDFBF9"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.clanchatmobile.zau5k2",
+      "package": "App.twogether.mobile",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
@@ -54,6 +55,7 @@
         }
       ],
       "expo-video",
+      "expo-notifications",
       [
         "expo-image-picker",
         {

@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
+import httpx
 from livekit import api as lk_api
 
 ROOT_DIR = Path(__file__).parent
@@ -166,6 +167,37 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+# ----------------------------- Push notifications (Emergent managed) -----------------------------
+PUSH_BASE_URL = "https://integrations.emergentagent.com"
+PUSH_KEY = os.environ.get("EMERGENT_PUSH_KEY", "placeholder")
+_push_client = httpx.AsyncClient(base_url=PUSH_BASE_URL, headers={"X-Push-Key": PUSH_KEY}, timeout=10.0)
+
+
+async def send_push(recipients: list, data: dict):
+    if not recipients:
+        return
+    try:
+        await _push_client.post("/api/v1/push/trigger", json={"recipients": recipients, "data": data})
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Push failed (non-blocking): {e}")
+
+
+class RegisterPushBody(BaseModel):
+    user_id: str
+    platform: str
+    device_token: str
+
+
+@api_router.post("/register-push", status_code=201)
+async def register_push(body: RegisterPushBody):
+    try:
+        resp = await _push_client.post("/api/v1/push/users/register", json=body.model_dump())
+        resp.raise_for_status()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"register-push failed: {e}")
+        return {"status": "deferred"}
+    return {"status": "registered"}
 
 
 def public_user(u: dict) -> dict:
@@ -422,6 +454,11 @@ async def send_message(body: MessageIn, user=Depends(get_current_user)):
     if expire_seconds and body.media_id:
         await db.media.update_one({"id": body.media_id}, {"$set": {"expire_seconds": expire_seconds}})
     await manager.broadcast(pair["id"], {"type": "message", "message": msg})
+    if body.kind != "system":
+        partner_id = pair["user_b"] if pair["user_a"] == user["id"] else pair["user_a"]
+        title = user.get("display_name") or "Twogether"
+        preview = "📷 Photo" if body.kind == "image" else "🎥 Video" if body.kind == "video" else "New message"
+        await send_push([partner_id], {"title": title, "message": preview, "action_url": "/(tabs)"})
     return {"message": msg}
 
 
