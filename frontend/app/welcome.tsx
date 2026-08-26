@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ImageBackground } from "react-native";
+import { View, Text, StyleSheet, Pressable, ImageBackground, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -16,34 +16,43 @@ export default function Welcome() {
 
   return (
     <View style={styles.container} testID="welcome-screen">
-      <ImageBackground source={{ uri: HERO }} style={styles.hero}>
-        <LinearGradient
-          colors={["rgba(43,37,36,0.15)", "rgba(43,37,36,0.55)", C.surface]}
-          locations={[0, 0.55, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      </ImageBackground>
-
-      <View style={[styles.content, { paddingBottom: insets.bottom + S.xl }]}>
-        <View style={styles.logoRow}>
-          <Image
-            source={require("../assets/images/logo.png")}
-            style={styles.logo}
-            contentFit="contain"
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <ImageBackground source={{ uri: HERO }} style={styles.hero}>
+          <LinearGradient
+            colors={["rgba(43,37,36,0.15)", "rgba(43,37,36,0.55)", C.surface]}
+            locations={[0, 0.55, 1]}
+            style={StyleSheet.absoluteFill}
           />
-        </View>
-        <Text style={styles.title}>A space just for the two of you</Text>
-        <Text style={styles.subtitle}>
-          Private, end-to-end encrypted, and built for one relationship. No groups, no noise —
-          just you and your person.
-        </Text>
+        </ImageBackground>
 
-        <View style={styles.features}>
-          <Feature icon="lock-closed" text="End-to-end encrypted" />
-          <Feature icon="heart" text="Shared calendar & worries space" />
-          <Feature icon="people" text="Exactly two, always private" />
-        </View>
+        <View style={styles.content}>
+          <View style={styles.logoRow}>
+            <Image
+              source={require("../assets/images/logo.png")}
+              style={styles.logo}
+              contentFit="contain"
+            />
+          </View>
+          <Text style={styles.title}>A space just for the two of you</Text>
+          <Text style={styles.subtitle}>
+            Private, end-to-end encrypted, and built for one relationship. No groups, no noise —
+            just you and your person.
+          </Text>
 
+          <View style={styles.features}>
+            <Feature icon="lock-closed" text="End-to-end encrypted" />
+            <Feature icon="heart" text="Shared calendar & worries space" />
+            <Feature icon="people" text="Exactly two, always private" />
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: insets.bottom + S.md }]}>
         <Pressable
           testID="welcome-get-started-button"
           style={styles.primaryBtn}
@@ -79,8 +88,10 @@ function Feature({ icon, text }: { icon: any; text: string }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.surface },
-  hero: { height: "48%", width: "100%" },
-  content: { flex: 1, paddingHorizontal: S.xl, marginTop: -S["2xl"] },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingBottom: S.lg },
+  hero: { height: 360, width: "100%" },
+  content: { paddingHorizontal: S.xl, marginTop: -S["2xl"] },
   logoRow: { alignItems: "flex-start", marginBottom: S.sm },
   logo: { width: 96, height: 96 },
   title: {
@@ -107,8 +118,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   featureText: { fontFamily: F.medium, fontSize: type.base, color: C.onSurface },
+  footer: {
+    paddingHorizontal: S.xl,
+    paddingTop: S.md,
+    backgroundColor: C.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.border ?? "rgba(0,0,0,0.06)",
+  },
   primaryBtn: {
-    marginTop: "auto",
     backgroundColor: C.brandPrimary,
     borderRadius: R.lg,
     paddingVertical: S.lg,
