@@ -1,0 +1,33 @@
+{
+  "summary": "Focused auth-flow verification for Twogether (Round 5) — CONFIRMED WORKING END-TO-END in the current preview environment. Backend at EXPO_PUBLIC_BACKEND_URL=https://clanchat-mobile-1.preview.emergentagent.com is healthy: POST /api/auth/register with a fresh unique email returned 200 with access_token + user; POST /api/auth/login with the same creds returned 200 with access_token + user; POST /api/auth/login with wrong password returned 401 (backend detail 'Incorrect email or password'). Frontend Expo web preview auth flow verified via Playwright at 375x667: /welcome loads (welcome-screen testID visible), both 'Get started' (welcome-get-started-button) and 'I already have an account' (welcome-login-link) are tappable and navigate correctly to /register and /login respectively — the recent pinned-footer + ScrollView change is intact. Register submit with a fresh testcouple+<ts>@example.com/secret123 (Tester) succeeded and landed on /pair. Then, after auth persists, visiting /login with the same credentials via the sign-in form succeeded and landed on /pair with NO 'Network request failed' error surfaced. Wrong-password path on the login form correctly surfaced 'Incorrect email or password' (auth error, not network error). The user's device APK 'Network request failed' is therefore NOT a code regression in the current app — it is consistent with a stale baked-in EXPO_PUBLIC_BACKEND_URL in their APK build (the forked preview URL has changed).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/test_round3_gallery.py",
+    "/app/backend/tests/test_round4_expiry_livekit.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "No code changes needed — sign-in flow is healthy. For the user's device issue, main agent should have the user rebuild the APK against the current EXPO_PUBLIC_BACKEND_URL (https://clanchat-mobile-1.preview.emergentagent.com) since the forked preview URL is what's baked into the JS bundle at build time. Verify GitHub Actions / EAS secret EXPO_PUBLIC_BACKEND_URL matches the active preview URL before the next build."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/src/lib/api.ts:3 correctly builds BASE from process.env.EXPO_PUBLIC_BACKEND_URL + '/api' — no localhost fallback, no hardcoded URL. Good.",
+    "/app/frontend/src/lib/api.ts:6-23 req() surfaces error.detail from JSON on non-2xx, which is why bad-password path shows 'Incorrect email or password' and NOT 'Network request failed'. This means a 'Network request failed' string can only come from fetch()'s TypeError (i.e. DNS/TLS/connectivity issue) — confirming the device error is environmental, not code.",
+    "/app/frontend/src/context/AuthContext.tsx signIn/signUp properly persist the JWT via api.setToken and populate context — end-to-end tested via UI, landed on /pair after both sign-up and sign-in.",
+    "/app/frontend/app/welcome.tsx now uses ScrollView + pinned footer; both Pressables are outside the ScrollView so they remain reachable regardless of scroll position — verified visually at 375x667."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (3/3 auth endpoints: register, login-ok, login-bad-pw)", "frontend": "100% (welcome nav, register submit, login submit ok, login submit bad-pw)"},
+  "seed_data_creation": "One ephemeral user created during the UI run: testcouple+<epoch>@example.com / secret123 (Tester). Also created earlier via curl. No cleanup performed (safe — isolated test emails).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The 'Network request failed' error the end user reported on their installed APK originates from fetch() throwing TypeError due to inability to reach the baked-in EXPO_PUBLIC_BACKEND_URL — most likely because the APK was built against a previous forked preview URL that no longer resolves. The current preview URL is https://clanchat-mobile-1.preview.emergentagent.com and both /api/auth/register and /api/auth/login work correctly there. In the Expo web preview, the sign-in and sign-up flows navigate to /pair on success, and wrong-password surfaces 'Incorrect email or password' cleanly. Do not modify api.ts, AuthContext, or welcome.tsx — they are all correct.",
+  "rca_of_issue": "Root cause of user-reported 'Network request failed' on device APK: stale EXPO_PUBLIC_BACKEND_URL baked into the APK's JS bundle at build time. When Expo forks the preview environment, the *.preview.emergentagent.com subdomain can change; APKs built before that change point at a dead URL, and fetch() throws TypeError('Network request failed'). Mitigation: rebuild the APK (EAS/GitHub Actions) with the CURRENT EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env (https://clanchat-mobile-1.preview.emergentagent.com), or configure the app to read the URL from a runtime-configurable source. No app-code fix is required — the sign-in flow itself is fully working in this environment as verified by both curl and Playwright."
+}

@@ -101,3 +101,8 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+## Round 8 (2026-06-26) — Sign-in "Network request failed" on device APK
+- User report: On installed Android APK, tapping "Sign in" shows "Network request failed".
+- Diagnosis: Backend is up & reachable at current preview URL (POST /api/auth/login -> 401 for bad creds). App code (api.ts BASE = EXPO_PUBLIC_BACKEND_URL + /api) is correct. Root cause is the APK baking a stale/unreachable EXPO_PUBLIC_BACKEND_URL (forked env changed the preview URL; GitHub secret likely points to old URL). Not an app code regression.
+- Also fixed welcome.tsx (scrollable + pinned CTA footer).
+- Test request: Verify auth end-to-end in preview — register a fresh user via UI, then sign out and sign back in successfully; confirm no regression from welcome.tsx change.
