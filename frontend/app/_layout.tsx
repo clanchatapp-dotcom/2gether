@@ -1,6 +1,6 @@
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LogBox, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Linking from "expo-linking";
@@ -22,13 +22,6 @@ if (Platform.OS !== "web") {
     }),
   });
 }
-if (Platform.OS === "android") {
-  Notifications.setNotificationChannelAsync("default", {
-    name: "Default",
-    importance: Notifications.AndroidImportance.MAX,
-    sound: "default",
-  });
-}
 
 // Disable logbox errors etc so that users can see the app
 // and agent works as expected.
@@ -38,7 +31,7 @@ LogBox.ignoreAllLogs(true);
 // Required because @expo/vector-icons' componentDidMount fallback fires
 // Font.loadAsync against a broken vendor path if any <Icon> mounts before
 // the family is registered — which throws on Android Expo Go.
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [iconsLoaded, iconError] = useIconFonts();
@@ -49,10 +42,31 @@ export default function RootLayout() {
     "DMSans-Bold": require("../assets/fonts/DMSans-Bold.ttf"),
   });
 
-  const ready = (iconsLoaded || iconError) && (fontsLoaded || fontError);
+  // Safety net: never let the app get stuck on the native splash. If font/
+  // asset loading stalls for any reason on a device build, force-proceed
+  // after a short timeout (Text simply falls back to the system font).
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Register the Android notification channel here (guarded) instead of at
+  // module load, so an early native hiccup can't block first render.
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      Notifications.setNotificationChannelAsync("default", {
+        name: "Default",
+        importance: Notifications.AndroidImportance.MAX,
+        sound: "default",
+      }).catch(() => {});
+    }
+  }, []);
+
+  const ready = ((iconsLoaded || iconError) && (fontsLoaded || fontError)) || timedOut;
 
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
+    if (ready) SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
 
   if (!ready) return null;
