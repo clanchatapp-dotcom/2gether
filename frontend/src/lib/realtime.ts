@@ -1,7 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { api } from "@/src/lib/api";
-
-const WS_BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || "").replace(/^http/, "ws");
+import { getServerHost } from "@/src/lib/config";
 
 // Lightweight WebSocket client with auto-reconnect for the paired room.
 export function useRealtime(onEvent: (e: any) => void, enabled: boolean) {
@@ -15,7 +14,7 @@ export function useRealtime(onEvent: (e: any) => void, enabled: boolean) {
     if (!enabled || closedRef.current) return;
     const token = await api.getToken();
     if (!token) return;
-    const url = `${WS_BASE}/api/ws?token=${encodeURIComponent(token as string)}`;
+    const url = `${getServerHost().replace(/^http/, "ws")}/api/ws?token=${encodeURIComponent(token as string)}`;
     try {
       const ws = new WebSocket(url);
       wsRef.current = ws;

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api } from "@/src/lib/api";
+import { loadApiBase } from "@/src/lib/config";
 import { ensureKeypair } from "@/src/lib/crypto";
 
 type User = {
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const boot = useCallback(async () => {
     try {
+      await loadApiBase();
       const t = await api.getToken();
       if (t) {
         setToken(t as string);

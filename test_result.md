@@ -106,3 +106,9 @@
 - Diagnosis: Backend is up & reachable at current preview URL (POST /api/auth/login -> 401 for bad creds). App code (api.ts BASE = EXPO_PUBLIC_BACKEND_URL + /api) is correct. Root cause is the APK baking a stale/unreachable EXPO_PUBLIC_BACKEND_URL (forked env changed the preview URL; GitHub secret likely points to old URL). Not an app code regression.
 - Also fixed welcome.tsx (scrollable + pinned CTA footer).
 - Test request: Verify auth end-to-end in preview — register a fresh user via UI, then sign out and sign back in successfully; confirm no regression from welcome.tsx change.
+
+## Round 9 (2026-06-26) — Login "404 page not found" + in-app server override
+- User report: On device, login showed "404 page not found" (previously "Network request failed"). RCA: the APK's baked EXPO_PUBLIC_BACKEND_URL points to a wrong/stale host whose ingress returns plain-text "404 page not found" for /api. Confirmed current preview backend is healthy (POST /api/auth/login -> 422/200).
+- Fix: added src/lib/config.ts (normalizeHost + loadApiBase/getApiBase/getServerHost/setServerHost with AsyncStorage override). api.ts now uses getApiBase(); realtime.ts uses getServerHost() for WS. AuthContext.boot calls loadApiBase() first. Added a "Server settings" panel on the login screen (testIDs: login-server-toggle, login-server-input, login-server-save, login-server-note) so users can point the app at the correct backend on-device WITHOUT rebuilding.
+- Test request: (1) verify normal login still works end-to-end with real creds; (2) verify the server-settings panel: toggle open, field prefilled with current host, save persists; (3) ensure normalizeHost handles trailing slash / missing scheme / trailing /api.
+- Real creds: thomasgallacher92@gmail.com / Ladyinred_1

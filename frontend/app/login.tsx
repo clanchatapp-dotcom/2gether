@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/src/context/AuthContext";
+import { getServerHost, setServerHost } from "@/src/lib/config";
 import { C, F, S, R, type } from "@/src/theme/theme";
 
 export default function Login() {
@@ -24,6 +25,21 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showServer, setShowServer] = useState(false);
+  const [serverUrl, setServerUrl] = useState("");
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    setServerUrl(getServerHost());
+  }, []);
+
+  const saveServer = async () => {
+    await setServerHost(serverUrl.trim());
+    setServerUrl(getServerHost());
+    setSavedNote(`Server set to ${getServerHost()}`);
+    setError(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
   const submit = async () => {
     setError(null);
@@ -85,6 +101,44 @@ export default function Login() {
               {error}
             </Text>
           ) : null}
+
+          <Pressable
+            testID="login-server-toggle"
+            onPress={() => setShowServer((v) => !v)}
+            style={styles.serverToggle}
+          >
+            <Ionicons
+              name={showServer ? "chevron-down" : "chevron-forward"}
+              size={16}
+              color={C.onSurfaceSecondary}
+            />
+            <Text style={styles.serverToggleText}>Connection problem? Server settings</Text>
+          </Pressable>
+
+          {showServer ? (
+            <View style={styles.serverBox}>
+              <Text style={styles.label}>Server address</Text>
+              <TextInput
+                testID="login-server-input"
+                style={styles.input}
+                placeholder="https://your-backend-url"
+                placeholderTextColor={C.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                value={serverUrl}
+                onChangeText={setServerUrl}
+              />
+              <Pressable testID="login-server-save" style={styles.serverSaveBtn} onPress={saveServer}>
+                <Text style={styles.serverSaveText}>Save server</Text>
+              </Pressable>
+              {savedNote ? (
+                <Text style={styles.serverNote} testID="login-server-note">
+                  {savedNote}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -128,6 +182,25 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   error: { fontFamily: F.medium, fontSize: type.base, color: C.error, marginTop: -S.sm },
+  serverToggle: { flexDirection: "row", alignItems: "center", gap: S.xs, marginTop: S.sm },
+  serverToggleText: { fontFamily: F.medium, fontSize: type.sm, color: C.onSurfaceSecondary },
+  serverBox: {
+    marginTop: S.md,
+    padding: S.lg,
+    borderRadius: R.md,
+    backgroundColor: C.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  serverSaveBtn: {
+    backgroundColor: C.onSurface,
+    borderRadius: R.md,
+    paddingVertical: S.md,
+    alignItems: "center",
+    marginBottom: -S.sm,
+  },
+  serverSaveText: { fontFamily: F.semibold, fontSize: type.base, color: C.surface },
+  serverNote: { fontFamily: F.regular, fontSize: type.sm, color: C.onSurfaceSecondary, marginTop: S.md },
   footer: { paddingHorizontal: S.xl, gap: S.md },
   primaryBtn: { backgroundColor: C.brandPrimary, borderRadius: R.lg, paddingVertical: S.lg, alignItems: "center" },
   primaryText: { fontFamily: F.semibold, fontSize: type.lg, color: C.onBrandPrimary },

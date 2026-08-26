@@ -1,6 +1,6 @@
 import { storage } from "@/src/utils/storage";
+import { getApiBase } from "@/src/lib/config";
 
-const BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || "") + "/api";
 const TOKEN_KEY = "tw_token_v1";
 
 async function req(path: string, opts: any = {}) {
@@ -10,7 +10,7 @@ async function req(path: string, opts: any = {}) {
     ...(opts.headers || {}),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(BASE + path, { ...opts, headers });
+  const res = await fetch(getApiBase() + path, { ...opts, headers });
   const text = await res.text();
   let data: any = {};
   try {
