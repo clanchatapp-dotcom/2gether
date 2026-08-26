@@ -89,10 +89,12 @@ function RoomView({ isVideo, partnerName, onEnd }: { isVideo: boolean; partnerNa
   const [muted, setMuted] = useState(false);
   const [camOn, setCamOn] = useState(isVideo);
 
-  const tracks = useTracks([Track.Source.Camera], { onlySubscribed: true });
+  const tracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const remoteTrack = tracks.find((t) => !t.participant.isLocal);
   const localTrack = tracks.find((t) => t.participant.isLocal);
   const remoteJoined = participants.some((p) => !p.isLocal);
+  // Show remote full-screen once they join; otherwise show my own camera full-screen.
+  const mainTrack = remoteTrack || localTrack;
 
   const toggleMute = async () => {
     Haptics.selectionAsync();
@@ -116,8 +118,8 @@ function RoomView({ isVideo, partnerName, onEnd }: { isVideo: boolean; partnerNa
 
   return (
     <View style={styles.room}>
-      {isVideo && remoteTrack ? (
-        <VideoTrack trackRef={remoteTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+      {isVideo && mainTrack && camOn ? (
+        <VideoTrack trackRef={mainTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
       ) : (
         <View style={styles.audioBg}>
           <View style={styles.avatar}>
@@ -128,7 +130,7 @@ function RoomView({ isVideo, partnerName, onEnd }: { isVideo: boolean; partnerNa
         </View>
       )}
 
-      {isVideo && camOn && localTrack ? (
+      {isVideo && camOn && remoteTrack && localTrack ? (
         <View style={[styles.pip, { top: insets.top + 12 }]}>
           <VideoTrack trackRef={localTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
         </View>

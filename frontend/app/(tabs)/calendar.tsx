@@ -239,7 +239,7 @@ export default function Calendar() {
 
       <Pressable
         testID="cal-add-button"
-        style={[styles.fab, { bottom: insets.bottom + 76 }]}
+        style={[styles.fab, { bottom: S.xl }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setModal(true);

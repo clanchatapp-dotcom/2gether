@@ -372,7 +372,7 @@ export default function Chat() {
       )}
 
       {/* Composer */}
-      <View style={[styles.composer, { paddingBottom: insets.bottom + 64 }]}>
+      <View style={[styles.composer, { paddingBottom: S.sm }]}>
         <Pressable
           testID="chat-attach-button"
           style={styles.attachBtn}

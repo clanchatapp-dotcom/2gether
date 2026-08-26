@@ -1,6 +1,5 @@
 import { Tabs } from "expo-router";
-import { Platform, StyleSheet, View } from "react-native";
-import { BlurView } from "expo-blur";
+import { StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { CallProvider } from "@/src/context/CallContext";
@@ -16,18 +15,10 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: C.muted,
         tabBarLabelStyle: { fontFamily: F.medium, fontSize: 11 },
         tabBarStyle: {
-          position: "absolute",
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: C.border,
-          backgroundColor: Platform.OS === "ios" ? "transparent" : C.surface,
-          elevation: 0,
+          backgroundColor: C.surface,
         },
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <BlurView tint="light" intensity={80} style={StyleSheet.absoluteFill} />
-          ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: C.surface }]} />
-          ),
       }}
       screenListeners={{
         tabPress: () => Haptics.selectionAsync(),

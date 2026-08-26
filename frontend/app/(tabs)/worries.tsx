@@ -147,7 +147,7 @@ export default function Worries() {
 
       <Pressable
         testID="worry-add-button"
-        style={[styles.fab, { bottom: insets.bottom + 76 }]}
+        style={[styles.fab, { bottom: S.xl }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setModal(true);

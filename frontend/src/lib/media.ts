@@ -57,20 +57,34 @@ export async function encryptAndUpload(
   return { media_id: res.media_id, media_nonce: nonce, media_mime: mime };
 }
 
+async function fetchCipherBytes(mediaId: string): Promise<Uint8Array> {
+  const token = await api.getToken();
+  const url = `${BASE}/media/${mediaId}`;
+  if (Platform.OS === "web") {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (r.status === 410) throw new Error("consumed");
+    if (!r.ok) throw new Error("Failed to load media");
+    return new Uint8Array(await r.arrayBuffer());
+  }
+  // Native: fetch binary via a file download (RN fetch().arrayBuffer() is unreliable).
+  const tmp = `${FileSystem.cacheDirectory}dl_${mediaId}.bin`;
+  const res = await FileSystem.downloadAsync(url, tmp, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 410) throw new Error("consumed");
+  if (res.status >= 400) throw new Error("Failed to load media");
+  const b64 = await FileSystem.readAsStringAsync(res.uri, { encoding: "base64" as any });
+  return util.decodeBase64(b64);
+}
+
 export async function fetchAndDecryptMedia(
   mediaId: string,
   mediaNonce: string,
   mime: string,
   partnerPub: string,
 ): Promise<string> {
-  const token = await api.getToken();
-  const r = await fetch(`${BASE}/media/${mediaId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (r.status === 410) throw new Error("consumed");
-  if (!r.ok) throw new Error("Failed to load media");
-  const buf = await r.arrayBuffer();
-  const plain = await decryptBytes(new Uint8Array(buf), mediaNonce, partnerPub);
+  const cipher = await fetchCipherBytes(mediaId);
+  const plain = await decryptBytes(cipher, mediaNonce, partnerPub);
   if (!plain) throw new Error("Unable to decrypt");
   return `data:${mime};base64,${util.encodeBase64(plain)}`;
 }
@@ -82,14 +96,8 @@ export async function decryptToPlayableUri(
   mime: string,
   partnerPub: string,
 ): Promise<string> {
-  const token = await api.getToken();
-  const r = await fetch(`${BASE}/media/${mediaId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (r.status === 410) throw new Error("consumed");
-  if (!r.ok) throw new Error("Failed to load media");
-  const buf = await r.arrayBuffer();
-  const plain = await decryptBytes(new Uint8Array(buf), mediaNonce, partnerPub);
+  const cipher = await fetchCipherBytes(mediaId);
+  const plain = await decryptBytes(cipher, mediaNonce, partnerPub);
   if (!plain) throw new Error("Unable to decrypt");
   if (Platform.OS === "web") {
     const blob = new Blob([plain], { type: mime });

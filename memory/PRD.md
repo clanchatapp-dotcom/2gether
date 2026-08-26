@@ -81,6 +81,13 @@ rebuilt fresh for React Native / Expo + FastAPI + MongoDB, following the spec co
 ## Deployment / builds (platform)
 - Push to GitHub: use the "Save to GitHub" button (paid plans). Android APK/AAB + iOS builds: Publish (top-right) → Deploy → Publish to Play Store / App Store. No EAS CLI or external tooling — Emergent manages Expo/EAS. eas.json is Emergent-managed and untouched.
 
+## Fixes — Round 7 (2026-06-26, device-build bugs)
+- Layout/scaling: bottom tab bar was `position:absolute` and overlapped screen content (chat composer hidden → "can't use chat"). Made the tab bar non-absolute (reserves layout space); removed the +64/+76 offsets that assumed an overlay bar. Chat composer paddingBottom → S.sm; calendar/worries FABs → bottom S.xl.
+- Media on device: replaced RN `fetch().arrayBuffer()` (unreliable on native) with `expo-file-system.downloadAsync` + base64 read in fetchCipherBytes(); fixes photos/gallery not loading on the installed APK (web still uses fetch/arrayBuffer).
+- Video call: show local camera FULL-SCREEN while waiting for partner, switch remote to full-screen + local PIP once partner joins (useTracks onlySubscribed:false so local track is included).
+- NOTE: these are native-build behaviors — user must regenerate the APK to verify.
+- Push notifications: NOT yet implemented — requires Emergent push integration + google-services.json + a device build (next task).
+
 ## Backlog / Remaining
 - P0: Wire LiveKit for real E2E voice/video calling (device build + signaling).
 - P0: Screenshot/save blocking (platform-native, device build only).
