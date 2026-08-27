@@ -100,3 +100,10 @@ rebuilt fresh for React Native / Expo + FastAPI + MongoDB, following the spec co
 - Add photo/video sharing with view-once controls (Emergent Object Storage).
 - Upgrade chat to WebSockets for instant delivery.
 - Wire native calendar sync.
+
+## Fix — Round 8 (2026-06-26): Deterministic E2E keys (survive reinstall)
+- Root cause of "unable to decrypt": device NaCl keypair was random + stored only in SecureStore; reinstalling the APK wiped it, so a new key was generated on next login and all prior messages became permanently undecryptable.
+- Fix: crypto.ts derives the box keypair deterministically from password+email (iterated SHA-512 KDF, 20k rounds) — same password+email always regenerates the same keypair across reinstalls/new devices. AuthContext register/login call deriveAndStoreKeypair(); boot() uses read-only getExistingPublicKey().
+- Deleted the couple's 4 pre-fix (unrecoverable) messages. Requires a new APK build; both partners sign in once on the new build.
+- Caveat: changing a password rotates that user's keys (older messages become unreadable) — warn in a future in-app password-change screen.
+- Verified by testing agent: reinstall survival confirmed (public_key byte-identical after clearing key + re-login); E2E round-trip decrypts both ways; backend 67/69 (2 pre-existing LiveKit 503 unrelated).

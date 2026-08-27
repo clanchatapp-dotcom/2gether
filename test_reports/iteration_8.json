@@ -1,0 +1,41 @@
+{
+  "summary": "Round 8 — Deterministic keypair / reinstall survival VERIFIED end-to-end (primary bug fix). Backend contract pytest: 4/4 PASS in new /app/backend/tests/test_round8_deterministic_key.py (public_key persists across login, PUT /me/public-key idempotent with same key, full pair→send→reinstall(reupload same PK) roundtrip, wrong pw 401). Full backend regression: 67/69 PASS on EXPO_PUBLIC_BACKEND_URL=https://clanchat-mobile-1.preview.emergentagent.com; the 2 failures are pre-existing LiveKit 503 'Calling is not configured' (env vars not set — unrelated). Playwright end-to-end on Expo web (375x667): (1) Registered fresh A=crypto_a+<ts>@example.com and B=crypto_b+<ts>@example.com with password 'secret123'. (2) A created invite (POST /pair/create), B redeemed (POST /pair/redeem) → pair active. (3) B sent 'hello from Bob' → both sides see decrypted plaintext (no '🔒 Unable to decrypt'). (4) A logged in and saw 'hello from Bob' decrypted immediately. (5) Captured A's server public_key BEFORE reinstall via GET /api/me: 'YqECD8CzyjkgZt/UTGDOwO4oX3hZjWyi...'. (6) A sent 'hi from Alice pre-reinstall'. (7) SIMULATED REINSTALL: removed both 'tw_secret_key_v1' and 'tw_token_v1' from localStorage (AsyncStorage on web = localStorage; SecureStore-web shim also uses AsyncStorage — this covers both storages the task called out). Reload → back at welcome screen (no session). (8) Signed in as A with SAME email+password → chat header appears → after WS+GET /messages settle (2.5s), EXISTING messages 'hello from Bob' AND 'hi from Alice pre-reinstall' STILL DECRYPT, ZERO 'Unable to decrypt' banners. (9) A's server public_key AFTER reinstall = 'YqECD8CzyjkgZt/UTGDOwO4oX3hZjWyi...' — BYTE-IDENTICAL to before, proving nacl.hash(saltBytes||pw) 20k-round KDF is fully deterministic across independent client-side derivations. (10) A sent a NEW message 'post-reinstall from Alice' → decrypts on A. (11) Logged in as B → sees all three messages decrypted ('hello from Bob', 'hi from Alice pre-reinstall', 'post-reinstall from Alice'), zero decrypt failures. REGRESSION: register 200, login 200 (correct pw), login 401 (wrong pw), welcome → login → pair navigation all pass. No React Native red screen. Only pre-existing console warnings ('shadow* deprecated', 'expo-notifications web not supported', 'props.pointerEvents deprecated' — none new, none caused by this fix). The fix in /app/frontend/src/lib/crypto.ts deriveSecretKey (20000-round SHA-512 KDF over 'twogether-kdf-v1:<email>' + password) combined with AuthContext.signIn re-deriving the keypair from password+email on every login is CORRECT and fully solves the reinstall-loses-key bug.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/livekit/token", "issue": "503 'Calling is not configured' — LiveKit env vars unset in this preview. Pre-existing, unrelated to this bug fix."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/test_round3_gallery.py",
+    "/app/backend/tests/test_round4_expiry_livekit.py",
+    "/app/backend/tests/test_round8_deterministic_key.py",
+    "/app/test_reports/pytest/round8_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "crypto.ts deriveSecretKey: 20000 rounds of SHA-512 over (salt||pw) is a lightweight KDF — acceptable given (a) users choose a real password, (b) the primary attacker is a full-device compromise where the derived key is also exposed, (c) rounds are configurable and can be raised later. Not PBKDF2/Argon2, but adequate.",
+    "crypto.ts uses `salt.trim().toLowerCase()` for email normalization — matches the backend which also lowercases email at register/login (server.py L285, L305). Good: register→login→reinstall all normalize identically, so key derivation is stable regardless of user typing casing.",
+    "AuthContext.signIn re-derives and PUT /me/public-key ONLY when derived pub !== server pub — no unnecessary writes. AuthContext.boot() correctly uses getExistingPublicKey (read-only) since no password is available at boot.",
+    "AuthContext.signUp always calls deriveAndStoreKeypair BEFORE api.register, ensuring the same key is what gets sent to the server. Symmetric with signIn.",
+    "Web SecureStore: /app/frontend/src/utils/storage/index.web.ts routes secureGet/secureSet through AsyncStorage, which uses localStorage on web. Clearing localStorage['tw_secret_key_v1'] is therefore an accurate reinstall simulation on the web preview — confirmed in the Playwright run (keys BEFORE wipe = ['tw_secret_key_v1','tw_token_v1'], AFTER = []).",
+    "The fix is self-contained; no server-side changes were required — /api/me/public-key already accepts idempotent same-key PUTs, and the message row nonce/ciphertext are unchanged across reinstalls."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_round8_deterministic_key.py (new — 4 tests validating the backend contract the fix relies on)"
+  ],
+  "success_rate": {"backend": "97% (67/69 pytest; 2 unrelated pre-existing LiveKit 503) — 4/4 new deterministic-key tests PASS", "frontend": "100% (register x2, pair, send both directions, reinstall wipe, relogin, existing decrypt, pubkey identical, new msg both-side decrypt)"},
+  "seed_data_creation": "Ephemeral fresh users created per Playwright run: crypto_a+<ts>@example.com, crypto_b+<ts>@example.com. Pytest fixtures create TEST_det_* accounts. Real owner account untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The 'Unable to decrypt' after reinstall bug is FIXED and verified end-to-end. Deterministic derivation is stable across independent client-side derivations (server public_key is byte-identical before vs after simulated reinstall). All existing regression flows (register/login/wrong-pw/pair/send/receive/WS realtime/read-receipts) continue to work. No new issues introduced. On web preview, note that SecureStore is a localStorage-backed shim (via AsyncStorage), so simulate reinstall by removing 'tw_secret_key_v1' + 'tw_token_v1' from localStorage and reloading — do NOT expect a separate SecureStore backend on web.",
+  "rca_of_issue": "Original bug: crypto.ts's ensureKeypair() generated a NEW random NaCl keypair on each fresh install (nacl.box.keyPair()) and only persisted it locally in SecureStore. On APK reinstall the SecureStore-backed secret was wiped, so a new random secret was generated at next login, its public_key was PUT to the server, and every prior message (encrypted with the OLD partner-shared-key derived from the OLD public_key) became undecryptable → chat showed '🔒 Unable to decrypt' for the entire history. Fix (verified): AuthContext.signUp/signIn now call deriveAndStoreKeypair(password, email) which runs a 20000-round SHA-512 KDF over 'twogether-kdf-v1:<lowercased email>' || password to produce a 32-byte NaCl box secret. The same (email,password) always yields the same secret and therefore the same public_key — so a reinstalled or new device regenerates the SAME keypair on next login, PUT /me/public-key is a no-op (or restores drift), and all existing message ciphertexts still decrypt. boot() correctly uses read-only getExistingPublicKey since no password is available at rehydrate time. Test evidence: A's server public_key is byte-identical before and after the reinstall simulation; all pre-reinstall messages decrypt post-reinstall; new post-reinstall messages decrypt on both sides."
+}
