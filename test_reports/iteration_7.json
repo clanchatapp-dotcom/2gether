@@ -1,0 +1,36 @@
+{
+  "summary": "Round 7 — Verified that the api.ts change (detect non-JSON/HTML response and throw a clean message instead of dumping raw HTML) did NOT regress normal JSON API flows. Backend pytest: 63/65 PASS on EXPO_PUBLIC_BACKEND_URL=https://clanchat-mobile-1.preview.emergentagent.com. The 20 tests in backend_test.py (register, login-ok/401, /me, public-key update, pair create/redeem/get, messages send+list+after-filter, worries, events) all PASS — confirming normal JSON parse path in api.ts still works. test_round2 (24 tests: media roundtrip, view-once 410, checkins gating), test_round3_gallery (all gallery + regression tests) PASS. Only 2 failures: test_round4 TestLiveKitToken (503 'Calling is not configured') — pre-existing, unrelated to this change. Direct curl regression: POST /api/auth/login with real creds -> 200 + JSON access_token; wrong pw -> 401 {\"detail\":\"Incorrect email or password\"}; Content-Type: application/json. Frontend UI (Expo web @ 375x667): (1) wrong-pw path — api.ts now reads res.text() then JSON.parse'd it correctly, login-error shows 'Incorrect email or password' (no raw HTML, no crash). (2) Correct-pw path — token JSON parsed, navigated /login -> /pair, 'Hi Tam 👋' visible (JSON success path intact). (3) Server settings panel — login-server-toggle reveals login-server-input prefilled with current host, login-server-save persists normalized value ('Server set to https://clanchat-mobile-1.preview.emergentagent.com', trailing slash stripped). No react-native red screen; only pre-existing warnings ('shadow* deprecated', 'expo-notifications web'). The api.ts change is safe: the looksHtml gate only fires when text.trim().startsWith('<'), and every backend response from this preview (both 2xx and 4xx) is application/json starting with '{', so the JSON.parse branch is always taken for real API traffic. The HTML branch is only reachable when a proxy/region-gate returns an HTML error page — that scenario cannot be reproduced from this test env (owner region), but the code path is straightforward and reviewed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/livekit/token", "issue": "Returns 503 'Calling is not configured' — LiveKit env vars not set in this preview. Pre-existing, unrelated to api.ts change. Only affects the calling feature."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/test_round3_gallery.py",
+    "/app/backend/tests/test_round4_expiry_livekit.py",
+    "/app/test_reports/pytest/round7_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/frontend/src/lib/api.ts: looksHtml = text.trim().startsWith('<') is a safe, cheap heuristic. It cannot false-positive on legitimate JSON API responses (JSON always starts with '{', '[', '\"', digit, 'true', 'false', 'null'). Verified live: both 200 JSON and 401 JSON responses take the JSON.parse branch and set error.message = data.detail correctly.",
+    "api.ts change consumes res.text() once then optionally JSON.parses it — this is fine (fetch body can only be consumed once, but the previous implementation also did res.json() which internally does the same). No double-read bug.",
+    "Region-restricted branch uses /region restricted/i regex, matching Emergent's 'Region Restricted - Emergent' banner. Generic HTML fallback message is user-actionable ('Check the Server address in login → Server settings.'). Good UX pairing with the existing login-server-toggle panel.",
+    "Minor: the HTML branch will not run for a 401 that happens to return HTML (e.g. some CDN 401 pages) — but message includes a Server-settings hint, so still actionable. No change needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "97% (63/65 pytest; 2 unrelated LiveKit 503 pre-existing)", "frontend": "100% (wrong-pw JSON error, correct-pw success -> /pair, server-settings toggle+save+normalize)"},
+  "seed_data_creation": "Used the real owner account (thomasgallacher92@gmail.com / Ladyinred_1). Pytest fixtures create ephemeral TEST_*@twogether-test.com accounts. No production data touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The api.ts non-JSON/HTML guard is verified safe: normal JSON responses (200 and 4xx) parse correctly, wrong-pw shows clean 'Incorrect email or password', correct-pw navigates to /pair. The HTML→clean-error branch cannot be reproduced from this test env because the preview backend is not region-blocked here — code path is a simple text-startsWith('<') check followed by throw new Error(...), which E1 can trust. Do not modify api.ts / config.ts / login.tsx.",
+  "rca_of_issue": "Original bug: a partner in another region saw the raw HTML 'Region Restricted - Emergent' page inside the login-error <Text> because api.ts previously called res.json() which threw a generic SyntaxError, and the fallback dumped the raw response body. Fix (already applied by E1): switch to res.text() first, detect leading '<' (HTML), throw a user-friendly Error whose .message is caught by login.tsx submit() and rendered in the login-error component. Verified: (a) the JSON branch is unchanged for real API traffic — both success (200) and auth-error (401) still surface exactly as before; (b) if the branch ever fires, the user gets an actionable message plus the existing on-device Server-settings override to point at a non-region-gated URL."
+}
