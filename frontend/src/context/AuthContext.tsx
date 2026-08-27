@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api } from "@/src/lib/api";
 import { loadApiBase } from "@/src/lib/config";
-import { ensureKeypair } from "@/src/lib/crypto";
+import { deriveAndStoreKeypair, getExistingPublicKey } from "@/src/lib/crypto";
 
 type User = {
   id: string;
@@ -62,8 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const me = await api.me();
         setUser(me.user);
         // Ensure the device keypair matches the server's stored public key.
-        const pub = await ensureKeypair();
-        if (pub !== me.user.public_key) {
+        const pub = await getExistingPublicKey();
+        if (pub && pub !== me.user.public_key) {
           await api.updatePublicKey(pub);
           setUser({ ...me.user, public_key: pub });
         }
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [boot]);
 
   const signUp = async (email: string, password: string, name: string) => {
-    const public_key = await ensureKeypair();
+    const public_key = await deriveAndStoreKeypair(password, email);
     const res = await api.register({ email, password, display_name: name, public_key });
     await api.setToken(res.access_token);
     setToken(res.access_token);
@@ -95,8 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await api.login({ email, password });
     await api.setToken(res.access_token);
     setToken(res.access_token);
-    // sync device key to server (fresh device gets a new key)
-    const public_key = await ensureKeypair();
+    // Deterministically re-derive this device's key from the password so it
+    // matches across reinstalls/new devices, then sync it to the server.
+    const public_key = await deriveAndStoreKeypair(password, email);
     let u = res.user;
     if (public_key !== res.user.public_key) {
       await api.updatePublicKey(public_key);
