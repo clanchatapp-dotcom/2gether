@@ -12,11 +12,27 @@ async function req(path: string, opts: any = {}) {
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(getApiBase() + path, { ...opts, headers });
   const text = await res.text();
+  const looksHtml = text.trim().startsWith("<");
+
+  // A proxy/region gate (or a wrong Server address) returns an HTML page
+  // instead of our JSON API. Surface a clean, actionable message rather than
+  // dumping raw HTML into the UI.
+  if (looksHtml) {
+    if (/region restricted/i.test(text)) {
+      throw new Error(
+        "This server is region-restricted (preview only). The app owner needs to deploy to production and use that URL in Server settings.",
+      );
+    }
+    throw new Error(
+      "Can't reach the app server. Check the Server address in login → Server settings.",
+    );
+  }
+
   let data: any = {};
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    data = { detail: text };
+    data = {};
   }
   if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
   return data;

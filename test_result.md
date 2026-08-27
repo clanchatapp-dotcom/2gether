@@ -112,3 +112,9 @@
 - Fix: added src/lib/config.ts (normalizeHost + loadApiBase/getApiBase/getServerHost/setServerHost with AsyncStorage override). api.ts now uses getApiBase(); realtime.ts uses getServerHost() for WS. AuthContext.boot calls loadApiBase() first. Added a "Server settings" panel on the login screen (testIDs: login-server-toggle, login-server-input, login-server-save, login-server-note) so users can point the app at the correct backend on-device WITHOUT rebuilding.
 - Test request: (1) verify normal login still works end-to-end with real creds; (2) verify the server-settings panel: toggle open, field prefilled with current host, save persists; (3) ensure normalizeHost handles trailing slash / missing scheme / trailing /api.
 - Real creds: thomasgallacher92@gmail.com / Ladyinred_1
+
+## Round 10 (2026-06-26) — "Region Restricted" HTML shown on login (partner in another region)
+- User report: girlfriend (different region) can't log in; app displays raw HTML titled "Region Restricted - Emergent". She could log in yesterday. RCA: preview URL (*.preview.emergentagent.com) is geo-restricted and temporary; the gate returns an HTML block page which api.ts previously dumped as the error text. Not an app-logic bug; durable fix is deploying to production.
+- Code improvement: api.ts now detects non-JSON/HTML responses and throws a clean, actionable message (region-restricted vs generic can't-reach) instead of raw HTML.
+- Test request: confirm normal login still works with real creds; wrong password still shows "Incorrect email or password"; ensure the new HTML-detection branch didn't break normal JSON flows (messages/pair etc.).
+- Real creds: thomasgallacher92@gmail.com / Ladyinred_1
