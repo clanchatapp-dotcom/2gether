@@ -201,7 +201,7 @@ export function MediaBubble({
           ) : (
             <>
               <Ionicons name="play-circle" size={40} color={C.brandPrimary} />
-              <Text style={styles.videoText}>{error || "Encrypted video"}</Text>
+              <Text style={styles.videoText}>{error || "Video"}</Text>
             </>
           )}
         </Pressable>

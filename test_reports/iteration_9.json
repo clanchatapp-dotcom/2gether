@@ -1,0 +1,47 @@
+{
+  "summary": "Round 9 — E2E ENCRYPTION REMOVAL (pass-through) VERIFIED end-to-end. Backend: 10/10 NEW tests PASS in /app/backend/tests/test_round9_no_encryption.py (plaintext text roundtrip both directions, history persistence across re-login, media upload+download bytes-identical, view-once → 410 after mark-viewed, auto-expire timer starts on recipient first open then 410 after TTL, gallery lists shared media, worries plaintext round-trip, checkin note plaintext, wrong password 401, register→pair still works). Full backend regression: 77/79 PASS on EXPO_PUBLIC_BACKEND_URL — the 2 failures are the pre-existing LiveKit env-not-configured 503 (unrelated). Frontend Playwright (390x844): (1) Registered fresh A + B (r9_a_<ts>@example.com / r9_b_<ts>@example.com, pw secret123), paired via API. (2) UI login as B → chat opens, sent 'hello from Bob 1' and 'second line from Bob' — 0 'Unable to decrypt'. (3) UI login as A → sees Bob's messages IMMEDIATELY as plaintext (0 decrypt failures). A sent 'reply from Alice 1' + 'another from Alice' — visible plaintext. (4) Opened chat + media modal — ALL required toggles present & visible: media-viewonce-toggle, media-save-toggle, media-expire-Off/1h/24h/7d, media-pick-photo, media-pick-video. (5) Page reload as A → all 4 prior messages STILL render as plaintext, 0 decrypt banners. (6) Worries: added 'worried about R9B test' → shows plaintext ✓. (7) Mood: selected mood chip + note 'optimistic today R9B' → note plaintext ✓. (8) Gallery: /gallery renders the uploaded image (1 <img> element, 0 decrypt errors) ✓. (9) Regression: wrong password on login shows login-error banner ✓; welcome→register/login navigation works ✓. Zero '🔒 Unable to decrypt' anywhere across all screens. No React Native red screen. Only pre-existing console warnings (shadow* deprecated, expo-notifications web unsupported) — none new. The pass-through crypto.ts (encryptMessage→{nonce:'',ciphertext:plain}, decryptMessage returns ciphertext as-is, encryptBytes/decryptBytes return raw bytes, deriveAndStoreKeypair/ensureKeypair→'e2e-off', getExistingPublicKey→null) works correctly with the unchanged backend which now stores plaintext in the nonce/ciphertext columns and raw bytes in media storage.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/livekit/token", "issue": "503 'Calling is not configured' — LIVEKIT_* env vars unset in this preview. Pre-existing, unrelated to this change."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "chat header + gallery header", "issues": ["Copy still says 'Private & screenshot-protected' on chat header and 'Encrypted · screenshots blocked' on gallery header. Since E2EE is now OFF, the 'Encrypted' wording is inaccurate. Consider changing to 'Screenshot-protected' only (screenshot blocking + view-once/expire remain), or 'Private' to avoid claiming encryption that is no longer in effect. File refs: /app/frontend/app/(tabs)/index.tsx (chat header subtitle) and /app/frontend/app/gallery.tsx (header subtitle)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_round9_no_encryption.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_round2.py",
+    "/app/backend/tests/test_round3_gallery.py",
+    "/app/backend/tests/test_round4_expiry_livekit.py",
+    "/app/backend/tests/test_round8_deterministic_key.py",
+    "/app/test_reports/pytest/round9_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL / COPY: Update chat header + gallery header text to remove the 'Encrypted' claim now that E2EE is disabled. Suggest: chat 'Screenshot-protected' and gallery 'Screenshots blocked'.",
+    "OPTIONAL / CLEANUP: server.py L479 comment '# ----- E2E Media -----' and MediaUploadIn.data_b64 docstring '# base64 of the ENCRYPTED (ciphertext) bytes' are now stale — data is stored raw. Rename/rewrite for clarity (no behavior change).",
+    "OPTIONAL: media.ts still names its function encryptAndUpload / fetchAndDecryptMedia and imports encryptBytes/decryptBytes (both no-ops). Consider renaming to uploadMedia/fetchMediaAsDataUri in a follow-up refactor. Not blocking — functionally correct as pass-through today."
+  ],
+  "critical_code_review_comments": [
+    "crypto.ts pass-through is correctly implemented: encryptMessage returns {nonce:'', ciphertext:plaintext}, decryptMessage returns ciphertext as-is (handles null via '??'). encryptBytes/decryptBytes are byte-identity. ensureKeypair/deriveAndStoreKeypair return constant 'e2e-off' so the AuthContext still has a non-empty public_key to POST at register time and existing 'if (partner?.public_key)' guards remain truthy.",
+    "server.py contract is unchanged and correctly agnostic: nonce/ciphertext are just opaque strings in the schema (MessageIn, WorryIn, CheckinIn) so they carry plaintext without any code changes. Media upload accepts base64 bytes and stores them raw via put_object; download returns them raw. view-once (consumed flag) and expire-on-first-open (expires_at) logic are untouched and continue to work — validated by round9 pytest.",
+    "Chat/Worries/Mood UI still call decryptMessage/decryptBytes on the client; since those pass through unchanged, the '🔒 Unable to decrypt' fallback in index.tsx L75/L127 and worries.tsx L51 will only fire if ciphertext is literally null — never for messages sent through the current build. VERIFIED via Playwright: 0 occurrences across all pages tested.",
+    "No _id leaks: server explicitly projects {'_id': 0} on all reads. Verified in test_send_and_list.",
+    "public_key='e2e-off' is a plain string sent by both signUp and signIn; register requires min_length=1, max_length=500 (server.py L219) — 'e2e-off' fits. No 400s."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_round9_no_encryption.py (new — 10 tests: text roundtrip, history persistence, media upload/download, view-once consume, expire-on-first-open, gallery, worries plaintext, checkin plaintext, wrong-pw 401, register/pair)"
+  ],
+  "success_rate": {"backend": "100% (10/10 round9 tests; 77/79 full regression — 2 unrelated pre-existing LiveKit 503)", "frontend": "100% (registration, pairing via API, chat send/receive both directions plaintext, history persists across re-login and reload with 0 decrypt failures, media modal toggles all present, gallery renders image, worries + mood plaintext, wrong-pw 401, welcome nav)"},
+  "seed_data_creation": "Ephemeral TEST_r9_* users created per pytest run and r9_a_<ts>/r9_b_<ts>@example.com for Playwright runs. Owner account thomasgallacher92@gmail.com untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "E2E encryption is DISABLED (crypto.ts is a pass-through). Text messages, worries, checkin notes, and media all round-trip as plaintext / raw bytes. The screenshot-protection + media privacy features (view-once, auto-expire on first open, allow-save toggle) still work — validated at the API layer. The backend schema still names fields 'nonce' and 'ciphertext' but they now carry plaintext — don't be fooled into thinking encryption is broken. The only real thing to look at next is minor UI copy (chat/gallery headers still say 'Encrypted') and eventual cleanup renaming of encryptAndUpload/fetchAndDecryptMedia. Do NOT rely on Playwright to save-a-worry via clicking worry-save-button — the on-screen keyboard pushes it out of viewport on the web preview; blur the input and use JS .click() as a workaround (see round9 script).",
+  "rca_of_issue": "Not a bug — this iteration is the intentional feature change to remove E2EE. Prior 'Unable to decrypt' failures were caused by keypair drift between installs (Round 8 attempted to fix via deterministic KDF but the user opted to remove encryption entirely). Current state: crypto.ts pass-through eliminates the entire class of decryption failures because there is no decryption. Verified by 0 'Unable to decrypt' banners across chat send-both-ways, chat reload, and gallery in the Playwright run, plus 10/10 backend contract tests passing."
+}

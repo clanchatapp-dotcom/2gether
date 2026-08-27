@@ -85,7 +85,7 @@ function CallScaffold() {
         <View style={styles.banner} testID="call-banner">
           <Ionicons name="information-circle" size={16} color={C.brandSecondary} />
           <Text style={styles.bannerText}>
-            Encrypted calling activates on your installed app build. This is a preview of the call
+            Calling activates on your installed app build. This is a preview of the call
             screen.
           </Text>
         </View>

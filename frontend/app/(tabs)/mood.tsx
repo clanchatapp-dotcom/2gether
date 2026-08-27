@@ -153,7 +153,7 @@ export default function Mood() {
           <TextInput
             testID="checkin-note-input"
             style={styles.noteInput}
-            placeholder="Add a note for your partner (optional, encrypted)"
+            placeholder="Add a note for your partner (optional)"
             placeholderTextColor={C.muted}
             value={note}
             onChangeText={setNote}

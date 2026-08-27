@@ -73,7 +73,7 @@ export default function Gallery() {
             <Text style={styles.headerTitle}>Shared Gallery</Text>
             <View style={styles.lockRow}>
               <Ionicons name="shield-checkmark" size={11} color={C.success} />
-              <Text style={styles.lockText}>Encrypted · screenshots blocked</Text>
+              <Text style={styles.lockText}>Private · screenshots blocked</Text>
             </View>
           </View>
         </View>
