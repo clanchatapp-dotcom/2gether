@@ -40,12 +40,12 @@ export default function Welcome() {
           </View>
           <Text style={styles.title}>A space just for the two of you</Text>
           <Text style={styles.subtitle}>
-            Private, end-to-end encrypted, and built for one relationship. No groups, no noise —
-            just you and your person.
+            Private and built for one relationship. No groups, no noise — just you and your
+            person.
           </Text>
 
           <View style={styles.features}>
-            <Feature icon="lock-closed" text="End-to-end encrypted" />
+            <Feature icon="lock-closed" text="Screenshot-protected & private" />
             <Feature icon="heart" text="Shared calendar & worries space" />
             <Feature icon="people" text="Exactly two, always private" />
           </View>

@@ -318,7 +318,7 @@ export default function Chat() {
           ) : (
             <View style={styles.e2eRow}>
               <Ionicons name="lock-closed" size={11} color={C.success} />
-              <Text style={styles.e2eText}>End-to-end encrypted</Text>
+              <Text style={styles.e2eText}>Private & screenshot-protected</Text>
             </View>
           )}
         </View>
@@ -344,8 +344,8 @@ export default function Chat() {
           </View>
           <Text style={styles.emptyTitle}>Start your conversation</Text>
           <Text style={styles.emptyText}>
-            Say hello to {partner?.display_name || "your partner"}. Everything here is private and
-            encrypted.
+            Say hello to {partner?.display_name || "your partner"}. Everything here stays just
+            between the two of you.
           </Text>
         </View>
       ) : (
@@ -411,7 +411,7 @@ export default function Chat() {
           <View style={[styles.mediaSheet, { paddingBottom: insets.bottom + S.lg }]} testID="chat-media-modal">
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Share privately</Text>
-            <Text style={styles.sheetHint}>Encrypted on your device before it's sent.</Text>
+            <Text style={styles.sheetHint}>Shared privately, just between the two of you.</Text>
 
             <Pressable style={styles.optRow} onPress={() => setViewOnce((v) => !v)} testID="media-viewonce-toggle">
               <View style={styles.optLeft}>

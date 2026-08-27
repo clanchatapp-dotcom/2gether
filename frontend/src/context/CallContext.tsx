@@ -99,7 +99,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             <Text style={styles.name}>{incoming?.name}</Text>
             <View style={styles.e2e}>
               <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.e2eText}>End-to-end encrypted</Text>
+              <Text style={styles.e2eText}>Private call</Text>
             </View>
           </View>
 

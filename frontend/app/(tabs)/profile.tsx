@@ -57,12 +57,12 @@ export default function Profile() {
         {/* Encryption */}
         <Text style={styles.sectionLabel}>Privacy & security</Text>
         <View style={styles.group}>
-          <Row icon="lock-closed" title="End-to-end encrypted" subtitle="Only the two of you can read your messages." tint />
+          <Row icon="lock-closed" title="Private to the two of you" subtitle="Only you and your partner can see your chats." tint />
           <Divider />
           <Row
             icon="images-outline"
             title="Photo & video controls"
-            subtitle="End-to-end encrypted, with per-item save & view-once."
+            subtitle="Per-item save, view-once & auto-expire controls."
           />
           <Divider />
           <Row
