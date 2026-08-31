@@ -113,7 +113,7 @@ export function MediaBubble({
     return () => {
       active = false;
     };
-  }, [msg.media_id, msg.media_nonce, partnerPub, isVideo, recipientViewOnce, msg.media_mime]);
+  }, [msg.media_id, partnerPub, isVideo, recipientViewOnce, msg.media_mime, expired]);
 
   const openImageOnce = async () => {
     if (consumed) return;
