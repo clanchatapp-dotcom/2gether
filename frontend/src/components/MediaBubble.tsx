@@ -95,7 +95,9 @@ export function MediaBubble({
   // Auto-load inline thumbnail for normal (non-view-once) images.
   useEffect(() => {
     let active = true;
-    if (!msg.media_id || !msg.media_nonce || !partnerPub) return;
+    // NOTE: encryption is disabled -> media_nonce is intentionally "".
+    // Only bail out on the fields that are actually required.
+    if (!msg.media_id || !partnerPub) return;
     if (expired || isVideo || recipientViewOnce) return; // videos & recipient view-once load on demand
     setLoading(true);
     setError(null);
