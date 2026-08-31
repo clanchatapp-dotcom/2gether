@@ -98,9 +98,15 @@ export function MediaBubble({
     if (!msg.media_id || !msg.media_nonce || !partnerPub) return;
     if (expired || isVideo || recipientViewOnce) return; // videos & recipient view-once load on demand
     setLoading(true);
-    fetchAndDecryptMedia(msg.media_id, msg.media_nonce, msg.media_mime || "image/jpeg", partnerPub)
+    setError(null);
+    // Ensure media_mime has a default value
+    const mime = msg.media_mime || "image/jpeg";
+    fetchAndDecryptMedia(msg.media_id, msg.media_nonce, mime, partnerPub)
       .then((u) => active && setUri(u))
-      .catch((e) => active && setError(e.message === "consumed" ? "Viewed" : "Couldn't load"))
+      .catch((e) => {
+        console.warn(`[MediaBubble] Failed to load media ${msg.media_id}:`, e);
+        active && setError(e.message === "consumed" ? "Viewed" : "Couldn't load");
+      })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -113,12 +119,14 @@ export function MediaBubble({
     setLoading(true);
     setError(null);
     try {
-      const u = await fetchAndDecryptMedia(msg.media_id!, msg.media_nonce!, msg.media_mime || "image/jpeg", partnerPub);
+      const mime = msg.media_mime || "image/jpeg";
+      const u = await fetchAndDecryptMedia(msg.media_id!, msg.media_nonce!, mime, partnerPub);
       setUri(u);
       setViewer(true);
       onViewed(msg.id);
       setConsumed(true);
     } catch (e: any) {
+      console.warn(`[MediaBubble] Failed to open image ${msg.media_id}:`, e);
       setError(e.message === "consumed" ? "Viewed" : "Couldn't load");
     } finally {
       setLoading(false);
@@ -130,7 +138,8 @@ export function MediaBubble({
     setLoading(true);
     setError(null);
     try {
-      const u = await decryptToPlayableUri(msg.media_id!, msg.media_nonce!, msg.media_mime || "video/mp4", partnerPub);
+      const mime = msg.media_mime || "video/mp4";
+      const u = await decryptToPlayableUri(msg.media_id!, msg.media_nonce!, mime, partnerPub);
       setVideoUri(u);
       setViewer(true);
       if (recipientViewOnce) {
@@ -138,6 +147,7 @@ export function MediaBubble({
         setConsumed(true);
       }
     } catch (e: any) {
+      console.warn(`[MediaBubble] Failed to open video ${msg.media_id}:`, e);
       setError(e.message === "consumed" ? "Viewed" : "Couldn't load");
     } finally {
       setLoading(false);
