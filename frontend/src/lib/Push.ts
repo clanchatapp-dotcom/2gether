@@ -36,4 +36,3 @@ export async function registerForPush(userId: string): Promise<void> {
     console.warn("[push] register failed:", e);
   }
 }
-
