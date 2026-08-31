@@ -3,9 +3,9 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import util from "tweetnacl-util";
 import { api } from "@/src/lib/api";
+import { getApiBase } from "@/src/lib/config";
 import { encryptBytes, decryptBytes } from "@/src/lib/crypto";
 
-const BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || "") + "/api";
 const MAX_BYTES = 20 * 1024 * 1024; // 20MB cap
 
 export type PickResult =
@@ -65,7 +65,7 @@ async function fetchCipherBytes(mediaId: string): Promise<Uint8Array> {
     throw new Error("No authentication token. Please log in again.");
   }
 
-  const url = `${BASE}/media/${mediaId}`;
+  const url = `${getApiBase()}/media/${mediaId}`;
   console.log(`[Media] Download URL: ${url}`);
   
   if (Platform.OS === "web") {
