@@ -59,22 +59,44 @@ export async function encryptAndUpload(
 
 async function fetchCipherBytes(mediaId: string): Promise<Uint8Array> {
   const token = await api.getToken();
+  console.log(`[Media] Fetching media ${mediaId} with token: ${token ? "present" : "MISSING"}`);
+  
+  if (!token) {
+    throw new Error("No authentication token. Please log in again.");
+  }
+
   const url = `${BASE}/media/${mediaId}`;
+  console.log(`[Media] Download URL: ${url}`);
+  
   if (Platform.OS === "web") {
+    console.log(`[Media] Using web fetch`);
     const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    console.log(`[Media] Web fetch response status: ${r.status}`);
     if (r.status === 410) throw new Error("consumed");
-    if (!r.ok) throw new Error("Failed to load media");
+    if (!r.ok) throw new Error(`Failed to load media: HTTP ${r.status}`);
     return new Uint8Array(await r.arrayBuffer());
   }
+  
   // Native: fetch binary via a file download (RN fetch().arrayBuffer() is unreliable).
   const tmp = `${FileSystem.cacheDirectory}dl_${mediaId}.bin`;
-  const res = await FileSystem.downloadAsync(url, tmp, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (res.status === 410) throw new Error("consumed");
-  if (res.status >= 400) throw new Error("Failed to load media");
-  const b64 = await FileSystem.readAsStringAsync(res.uri, { encoding: "base64" as any });
-  return util.decodeBase64(b64);
+  console.log(`[Media] Native download to: ${tmp}`);
+  
+  try {
+    const res = await FileSystem.downloadAsync(url, tmp, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log(`[Media] Native download response status: ${res.status}`);
+    
+    if (res.status === 410) throw new Error("consumed");
+    if (res.status >= 400) throw new Error(`Failed to load media: HTTP ${res.status}`);
+    
+    const b64 = await FileSystem.readAsStringAsync(res.uri, { encoding: "base64" as any });
+    console.log(`[Media] Downloaded and decoded ${b64.length} base64 chars`);
+    return util.decodeBase64(b64);
+  } catch (e: any) {
+    console.error(`[Media] Download error:`, e);
+    throw e;
+  }
 }
 
 export async function fetchAndDecryptMedia(
@@ -83,10 +105,23 @@ export async function fetchAndDecryptMedia(
   mime: string,
   partnerPub: string,
 ): Promise<string> {
-  const cipher = await fetchCipherBytes(mediaId);
-  const plain = await decryptBytes(cipher, mediaNonce, partnerPub);
-  if (!plain) throw new Error("Unable to decrypt");
-  return `data:${mime};base64,${util.encodeBase64(plain)}`;
+  console.log(`[Media] fetchAndDecryptMedia start: ${mediaId}`);
+  try {
+    const cipher = await fetchCipherBytes(mediaId);
+    console.log(`[Media] Got cipher bytes: ${cipher.length} bytes`);
+    
+    const plain = await decryptBytes(cipher, mediaNonce, partnerPub);
+    console.log(`[Media] Decrypted: ${plain ? plain.length + " bytes" : "null"}`);
+    
+    if (!plain) throw new Error("Unable to decrypt");
+    
+    const dataUri = `data:${mime};base64,${util.encodeBase64(plain)}`;
+    console.log(`[Media] Created data URI: ${dataUri.slice(0, 50)}...`);
+    return dataUri;
+  } catch (e: any) {
+    console.error(`[Media] fetchAndDecryptMedia error:`, e);
+    throw e;
+  }
 }
 
 // Returns a playable file/blob URI (for expo-video) by decrypting to a local file (native) or blob (web).
@@ -96,15 +131,32 @@ export async function decryptToPlayableUri(
   mime: string,
   partnerPub: string,
 ): Promise<string> {
-  const cipher = await fetchCipherBytes(mediaId);
-  const plain = await decryptBytes(cipher, mediaNonce, partnerPub);
-  if (!plain) throw new Error("Unable to decrypt");
-  if (Platform.OS === "web") {
-    const blob = new Blob([plain], { type: mime });
-    return URL.createObjectURL(blob);
+  console.log(`[Media] decryptToPlayableUri start: ${mediaId}`);
+  try {
+    const cipher = await fetchCipherBytes(mediaId);
+    console.log(`[Media] Got cipher for playable: ${cipher.length} bytes`);
+    
+    const plain = await decryptBytes(cipher, mediaNonce, partnerPub);
+    console.log(`[Media] Decrypted for playable: ${plain ? plain.length + " bytes" : "null"}`);
+    
+    if (!plain) throw new Error("Unable to decrypt");
+    
+    if (Platform.OS === "web") {
+      const blob = new Blob([plain], { type: mime });
+      const uri = URL.createObjectURL(blob);
+      console.log(`[Media] Created blob URI for web`);
+      return uri;
+    }
+    
+    const ext = mime.includes("mp4") ? "mp4" : mime.split("/")[1] || "mp4";
+    const path = `${FileSystem.cacheDirectory}tw_${mediaId}.${ext}`;
+    console.log(`[Media] Writing playable to: ${path}`);
+    
+    await FileSystem.writeAsStringAsync(path, util.encodeBase64(plain), { encoding: "base64" as any });
+    console.log(`[Media] Wrote playable file successfully`);
+    return path;
+  } catch (e: any) {
+    console.error(`[Media] decryptToPlayableUri error:`, e);
+    throw e;
   }
-  const ext = mime.includes("mp4") ? "mp4" : mime.split("/")[1] || "mp4";
-  const path = `${FileSystem.cacheDirectory}tw_${mediaId}.${ext}`;
-  await FileSystem.writeAsStringAsync(path, util.encodeBase64(plain), { encoding: "base64" as any });
-  return path;
 }
