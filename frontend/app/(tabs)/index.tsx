@@ -279,12 +279,18 @@ export default function Chat() {
       <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowTheirs]}>
         <View style={{ maxWidth: "78%", alignItems: mine ? "flex-end" : "flex-start" }}>
           {isMedia && item.media_id ? (
-            <MediaBubble
-              msg={item as any}
-              mine={mine}
-              partnerPub={partner?.public_key || ""}
-              onViewed={(id) => api.markViewed(id).catch(() => {})}
-            />
+            <>
+              <MediaBubble
+                msg={item as any}
+                mine={mine}
+                partnerPub={partner?.public_key || ""}
+                onViewed={(id) => api.markViewed(id).catch(() => {})}
+              />
+              {/* Add timestamp below media */}
+              <Text style={[styles.time, mine ? styles.timeMine : styles.timeTheirs, { marginTop: S.xs }]}>
+                {new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </Text>
+            </>
           ) : (
             <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
               <Text style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextTheirs]}>
