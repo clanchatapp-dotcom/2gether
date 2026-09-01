@@ -457,7 +457,15 @@ async def send_message(body: MessageIn, user=Depends(get_current_user)):
     if body.kind != "system":
         partner_id = pair["user_b"] if pair["user_a"] == user["id"] else pair["user_a"]
         title = user.get("display_name") or "Twogether"
-        preview = "📷 Photo" if body.kind == "image" else "🎥 Video" if body.kind == "video" else "New message"
+        # 🔥 view-once OR disappearing content wins over kind
+        if body.view_once or (expire_seconds and expire_seconds > 0):
+            preview = "sent you 🔥"
+        elif body.kind == "image":
+            preview = "sent you 📷"
+        elif body.kind == "video":
+            preview = "sent you 📹"
+        else:
+            preview = "sent you a message"
         await send_push([partner_id], {"title": title, "message": preview, "action_url": "/(tabs)"})
     return {"message": msg}
 
@@ -776,3 +784,4 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+

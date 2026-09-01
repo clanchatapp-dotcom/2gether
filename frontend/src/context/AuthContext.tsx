@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { api } from "@/src/lib/api";
 import { loadApiBase } from "@/src/lib/config";
 import { deriveAndStoreKeypair, getExistingPublicKey } from "@/src/lib/crypto";
+import { registerForPush } from "@/src/lib/push";
 
 type User = {
   id: string;
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(t as string);
         const me = await api.me();
         setUser(me.user);
+        registerForPush(me.user.id);
         // Ensure the device keypair matches the server's stored public key.
         const pub = await getExistingPublicKey();
         if (pub && pub !== me.user.public_key) {
@@ -88,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await api.setToken(res.access_token);
     setToken(res.access_token);
     setUser(res.user);
+    registerForPush(res.user.id);
     setPairStatus("none");
   };
 
@@ -104,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       u = { ...res.user, public_key };
     }
     setUser(u);
+    registerForPush(u.id);
     await refreshPair();
   };
 
