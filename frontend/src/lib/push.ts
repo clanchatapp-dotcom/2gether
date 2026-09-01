@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import { api } from "@/src/lib/api";
 
 /**
  * Register device for push notifications.
@@ -33,25 +34,13 @@ export async function registerForPush(userId: string): Promise<void> {
     // Determine platform
     const platform = Platform.OS === "ios" ? "ios" : "android";
 
-    // Register with backend
+    // Register with backend using the api module
     try {
-      const response = await fetch("http://localhost:3000/api/register-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          platform,
-          device_token: token.data,
-        }),
-      });
-
-      if (response.ok) {
-        console.log("[Push] Successfully registered with backend");
-      } else {
-        console.warn(`[Push] Backend registration failed: ${response.status}`);
-      }
-    } catch (e) {
-      console.warn("[Push] Failed to register with backend:", e);
+      console.log(`[Push] Sending device token to backend...`);
+      const result = await api.registerPush(platform, token.data, userId);
+      console.log(`[Push] Successfully registered with backend:`, result);
+    } catch (e: any) {
+      console.warn("[Push] Failed to register with backend:", e.message);
     }
   } catch (e) {
     console.error("[Push] Error in registerForPush:", e);
