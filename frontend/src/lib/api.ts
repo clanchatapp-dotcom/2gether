@@ -48,6 +48,8 @@ export const api = {
   me: () => req("/me"),
   updatePublicKey: (public_key: string) =>
     req("/me/public-key", { method: "PUT", body: JSON.stringify({ public_key }) }),
+  registerPush: (platform: string, device_token: string, user_id: string) =>
+    req("/register-push", { method: "POST", body: JSON.stringify({ user_id, platform, device_token }) }),
 
   pairCreate: () => req("/pair/create", { method: "POST" }),
   pairRedeem: (code: string) => req("/pair/redeem", { method: "POST", body: JSON.stringify({ code }) }),

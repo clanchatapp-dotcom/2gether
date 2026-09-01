@@ -60,6 +60,7 @@ export default function Chat() {
   const [allowSave, setAllowSave] = useState(true);
   const [expireSeconds, setExpireSeconds] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const listRef = useRef<FlatList<Msg>>(null);
   const lastTs = useRef<string | null>(null);
   const typingTimeout = useRef<any>(null);
@@ -198,8 +199,11 @@ export default function Chat() {
       lastTs.current = m.created_at;
       setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
       setTexts((prev) => ({ ...prev, [m.id]: body }));
-    } catch {
+    } catch (e: any) {
+      console.error("[Chat] Text message send error:", e);
       setDraft(body);
+      setErrorMsg(e.message || "Failed to send message");
+      setTimeout(() => setErrorMsg(null), 3000);
     } finally {
       setSending(false);
     }
@@ -219,8 +223,13 @@ export default function Chat() {
     setReadAll(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      console.log(`[Chat] Uploading ${kind}...`);
       const media = await encryptAndUpload(picked.uri, picked.mime, kind, partner.public_key);
+      console.log(`[Chat] Upload complete. Media ID: ${media.media_id}`);
+      
       const enc = await encryptMessage("", partner.public_key); // empty caption placeholder
+      console.log(`[Chat] Encryption complete. Sending message with media...`);
+      
       const res = await api.sendMessage({
         ...enc,
         kind,
@@ -231,12 +240,16 @@ export default function Chat() {
         allow_save: allowSave,
         expire_seconds: expireSeconds || null,
       });
+      
+      console.log(`[Chat] Message sent successfully. Message ID: ${res.message.id}`);
       const m: Msg = res.message;
       lastTs.current = m.created_at;
       setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
       setTexts((prev) => ({ ...prev, [m.id]: "" }));
-    } catch (e) {
-      // silently ignore; could show toast
+    } catch (e: any) {
+      console.error("[Chat] Media upload/send error:", e);
+      setErrorMsg(e.message || "Failed to send media");
+      setTimeout(() => setErrorMsg(null), 3000);
     } finally {
       setUploading(false);
       setViewOnce(false);
@@ -403,6 +416,14 @@ export default function Chat() {
           <Ionicons name="arrow-up" size={22} color={C.onBrandPrimary} />
         </Pressable>
       </View>
+
+      {/* Error toast */}
+      {errorMsg ? (
+        <View style={styles.errorToast} testID="chat-error-toast">
+          <Ionicons name="alert-circle" size={16} color={C.onBrandPrimary} />
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        </View>
+      ) : null}
 
       {/* Media picker modal */}
       <Modal visible={mediaModal} transparent animationType="slide" onRequestClose={() => setMediaModal(false)}>
@@ -656,6 +677,18 @@ const styles = StyleSheet.create({
   expireChipOn: { backgroundColor: C.brandPrimary, borderColor: C.brandPrimary },
   expireChipText: { fontFamily: F.semibold, fontSize: type.base, color: C.onSurfaceSecondary },
   expireChipTextOn: { color: C.onBrandPrimary },
+  errorToast: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: S.sm,
+    backgroundColor: "#DC2626",
+    paddingHorizontal: S.lg,
+    paddingVertical: S.md,
+    marginHorizontal: S.lg,
+    marginBottom: S.sm,
+    borderRadius: R.lg,
+  },
+  errorText: { fontFamily: F.medium, fontSize: type.base, color: C.onBrandPrimary, flex: 1 },
   modalScrim: { flex: 1, backgroundColor: "rgba(43,37,36,0.5)", alignItems: "center", justifyContent: "center", padding: S["2xl"] },
   modalCard: { backgroundColor: C.surface, borderRadius: R.lg, padding: S.xl, alignItems: "center", width: "100%" },
   modalIcon: {

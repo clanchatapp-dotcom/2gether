@@ -23,9 +23,12 @@ if (Platform.OS !== "web") {
   });
 }
 
-// Disable logbox errors etc so that users can see the app
-// and agent works as expected.
-LogBox.ignoreAllLogs(true);
+// Only ignore specific warnings we don't care about
+// Keep all errors and critical logs visible for debugging
+LogBox.ignoreLogs([
+  "Non-serializable values were found in the navigation state",
+  "ViewPropTypes will be removed",
+]);
 
 // Keep the native splash visible from cold start until icon fonts register.
 // Required because @expo/vector-icons' componentDidMount fallback fires
